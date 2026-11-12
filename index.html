@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson Tree Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #070c16;
+  --panel-bg: rgba(11, 18, 32, 0.94);
+  --fg: #eaf1fb;
+  --mut: #8296af;
+  --cy: #5ef2ff;
+  --cy-glow: rgba(94, 242, 255, 0.35);
+  --vi: #8b7bff;
+  --vi-glow: rgba(139, 123, 255, 0.3);
+  --gold: #ffd166;
+  --gold-glow: rgba(255, 209, 102, 0.35);
+  --green: #06d6a0;
+  --bad: #ff7a90;
+  --glass: rgba(255, 255, 255, 0.05);
+  --edge: rgba(130, 165, 215, 0.28);
+  --edge-active: #5ef2ff;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.45 'Sora', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+#wrap {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  background-image: 
+    radial-gradient(circle at 50% 10%, rgba(94, 242, 255, 0.04) 0%, transparent 60%),
+    linear-gradient(rgba(94, 242, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(94, 242, 255, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 48px 48px, 48px 48px;
+}
+
+#canvas {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+path {
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  transition: opacity 0.35s ease, stroke 0.3s ease;
+}
+
+path.c {
+  stroke: var(--cy);
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 6px var(--cy-glow));
+}
+
+path.gone {
+  opacity: 0;
+}
+
+.node {
+  position: absolute;
+  z-index: 2;
+  transition: left 0.55s cubic-bezier(0.2, 0.9, 0.3, 1), 
+              top 0.55s cubic-bezier(0.2, 0.9, 0.3, 1), 
+              opacity 0.4s ease, 
+              transform 0.4s ease;
+}
+
+.node.trim {
+  opacity: 0;
+  transform: scale(0.65);
+  pointer-events: none;
+}
+
+/* Decision Nodes (Parents) */
+.dn {
+  width: 260px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: radial-gradient(130% 140% at 0 0, rgba(139, 123, 255, 0.24), rgba(94, 242, 255, 0.08) 70%, rgba(6, 10, 18, 0.88));
+  border: 1px solid rgba(94, 242, 255, 0.45);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 0 24px rgba(94, 242, 255, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.dn.wide {
+  width: 320px;
+}
+
+.dn .pill {
+  display: inline-block;
+  padding: 2px 8px;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cy);
+  background: rgba(94, 242, 255, 0.12);
+  border-radius: 20px;
+  border: 1px solid rgba(94, 242, 255, 0.25);
+}
+
+.dn b {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+
+.dn .hint {
+  display: none;
+}
+
+.dn.done {
+  opacity: 0.85;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  border-color: rgba(94, 242, 255, 0.28);
+}
+
+.dn .note {
+  display: block;
+  margin-top: 8px;
+  color: var(--bad);
+  font-size: 12px;
+}
+
+.dn textarea {
+  display: block;
+  width: 100%;
+  height: 72px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+  resize: none;
+  outline: 0;
+  transition: border-color 0.2s;
+}
+
+.dn textarea:focus {
+  border-color: var(--cy);
+}
+
+.dn textarea::placeholder {
+  color: var(--mut);
+}
+
+.go {
+  margin-top: 14px;
+  width: 100%;
+  visibility: hidden;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font: 600 13px 'Sora', system-ui, sans-serif;
+  color: #04121a;
+  background: linear-gradient(90deg, var(--cy), var(--vi));
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+  box-shadow: 0 0 16px rgba(94, 242, 255, 0.3);
+}
+
+.go:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 22px rgba(94, 242, 255, 0.5);
+}
+
+.go:active {
+  transform: translateY(0);
+}
+
+.dn.ready .go {
+  visibility: visible;
+}
+
+.dn.done .go {
+  display: none;
+}
+
+/* Leaf Cards (Branches) */
+.card {
+  width: 280px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(140, 170, 210, 0.24);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s, transform 0.2s;
+}
+
+.card:hover {
+  border-color: rgba(94, 242, 255, 0.6);
+  background: rgba(255, 255, 255, 0.07);
+  transform: translateY(-2px);
+}
+
+.card.on {
+  border-color: var(--cy);
+  background: rgba(94, 242, 255, 0.14);
+  box-shadow: 0 0 24px rgba(94, 242, 255, 0.32);
+}
+
+.card .title {
+  font-weight: 500;
+  font-size: 13.5px;
+  color: var(--fg);
+  line-height: 1.4;
+}
+
+.card.on .title {
+  color: #fff;
+  font-weight: 600;
+}
+
+.card .desc {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.4;
+  white-space: pre-line;
+  max-height: 96px;
+  overflow-y: auto;
+}
+
+.card .desc::-webkit-scrollbar {
+  width: 4px;
+}
+.card .desc::-webkit-scrollbar-thumb {
+  background: rgba(140, 170, 210, 0.3);
+  border-radius: 2px;
+}
+
+.card.on .desc {
+  color: rgba(232, 241, 255, 0.9);
+}
+
+.card .tg {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--cy);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+/* Time Balancer Widget — redesigned as stat-bar cards */
+.time-widget {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Triple-colour overview strip — no text, colours only */
+.time-track {
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.time-seg {
+  height: 100%;
+  transition: width 0.3s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.seg-starter { background: linear-gradient(90deg, #4ef2bb, var(--cy)); }
+.seg-main    { background: linear-gradient(90deg, var(--vi), #b39ddb); }
+.seg-closure { background: linear-gradient(90deg, #ffc107, #ffd166); }
+
+/* Each activity card: label left, minutes right, coloured bar below */
+.time-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(140, 170, 210, 0.18);
+  border-radius: 12px;
+  padding: 10px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  cursor: default;
+}
+
+.time-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.time-card-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.time-card-val {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.val-starter { color: var(--cy); }
+.val-main    { color: var(--vi); }
+.val-closure { color: var(--gold); }
+
+/* Bar track inside each card — removed (slider is the only control) */
+
+/* Slider — no thumb, coloured fill track */
+.time-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  border: none;
+  background: rgba(255,255,255,0.08); /* JS overrides this with gradient */
+}
+
+/* Hide thumb on WebKit / Chrome / Safari */
+.time-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+/* Hide thumb on Firefox */
+.time-slider::-moz-range-thumb {
+  width: 0;
+  height: 0;
+  opacity: 0;
+  border: none;
+  background: transparent;
+}
+
+/* Hide thumb on Edge/IE */
+.time-slider::-ms-thumb {
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+/* Preset pills — keep but restyle slightly */
+.time-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.preset-pill {
+  flex: 1 1 45%;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(140, 170, 210, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--mut);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.preset-pill:hover {
+  border-color: var(--cy);
+  color: var(--fg);
+  background: rgba(94, 242, 255, 0.1);
+}
+
+.preset-pill.active {
+  border-color: var(--cy);
+  background: rgba(94, 242, 255, 0.16);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Hidden elements */
+.time-row    { display: none !important; }
+.total-badge { display: none !important; }
+.step-btn    { display: none !important; }
+
+/* Final Generation Node */
+.final {
+  width: 290px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: var(--glass);
+  border: 1px solid var(--cy);
+  box-shadow: 0 0 32px rgba(94, 242, 255, 0.25);
+  backdrop-filter: blur(14px);
+  text-align: center;
+}
+
+.final .go {
+  visibility: visible;
+  margin-top: 0;
+  padding: 12px;
+  font-size: 14px;
+}
+
+.final .go:disabled {
+  opacity: 0.55;
+  cursor: wait;
+  transform: none;
+}
+
+#msg {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+#msg:empty { display: none; }
+#msg a { color: var(--cy); text-decoration: underline; font-weight: 600; }
+#msg.err { color: var(--bad); }
+
+/* Top HUD bar */
+#hud {
+  position: fixed;
+  left: 24px;
+  top: 18px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: rgba(10, 16, 28, 0.75);
+  backdrop-filter: blur(10px);
+  border-radius: 30px;
+  border: 1px solid rgba(140, 170, 210, 0.2);
+}
+
+#stage {
+  font-weight: 500;
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+#stage-num {
+  color: var(--cy);
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+#dots {
+  display: flex;
+  gap: 5px;
+}
+
+#dots i {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(140, 170, 210, 0.24);
+  transition: all 0.3s ease;
+}
+
+#dots i.d {
+  background: var(--cy);
+  box-shadow: 0 0 8px var(--cy);
+}
+
+#dots i.n {
+  background: var(--vi);
+  width: 22px;
+}
+
+/* Settings Gear & Panel */
+#gear {
+  position: fixed;
+  right: 20px;
+  top: 16px;
+  z-index: 11;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(140, 170, 210, 0.3);
+  background: var(--glass);
+  backdrop-filter: blur(8px);
+  color: var(--fg);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.2s;
+}
+
+#gear:hover {
+  border-color: var(--cy);
+  transform: rotate(30deg);
+}
+
+#panel {
+  position: fixed;
+  right: 20px;
+  top: 66px;
+  z-index: 11;
+  width: 300px;
+  padding: 18px;
+  border-radius: 16px;
+  background: var(--panel-bg);
+  border: 1px solid rgba(94, 242, 255, 0.3);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#panel.open { display: flex; }
+
+#panel h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cy);
+}
+
+#panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--mut);
+}
+
+#panel input, #panel select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg);
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(140, 170, 210, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+#panel select option {
+  background: #0d1525;
+  color: #fff;
+}
+
+#panel .row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+#panel .row button {
+  flex: 1;
+  padding: 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(140, 170, 210, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#panel .row button:hover {
+  background: rgba(94, 242, 255, 0.12);
+  border-color: var(--cy);
+}
+
+/* Toast alert notification */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 12;
+  max-width: min(600px, 90vw);
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: rgba(14, 22, 38, 0.96);
+  border: 1px solid var(--cy);
+  color: var(--fg);
+  font-size: 13px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  display: none;
+  cursor: pointer;
+}
+
+button:focus-visible, .card:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--cy);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node, path { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <span id="stage"><span id="stage-num">Step 1</span> <span id="stage-text">Strand Selection</span></span>
+  <span id="dots"></span>
+</div>
+
+<button id="gear" aria-label="Settings">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+    <path d="M4 7h10M18 7h2M4 17h2M10 17h10"/>
+    <circle cx="16" cy="7" r="2"/>
+    <circle cx="8" cy="17" r="2"/>
+  </svg>
+</button>
+
+<div id="panel">
+  <h3>Planner Configuration</h3>
+  <label>Subject / Scheme
+    <select id="scheme"></select>
+  </label>
+  <label>Week Number
+    <input id="week" placeholder="e.g. 14">
+  </label>
+  <label>Grade / Class
+    <input id="grade" placeholder="e.g. 10">
+  </label>
+  <label>Lessons Count
+    <input id="lessons" type="number" min="1" max="20" placeholder="Auto (1 tab per outcome)">
+  </label>
+  <label>Master Template File ID
+    <input id="tpl">
+  </label>
+  <label>Google Drive Output Folder ID
+    <input id="folder">
+  </label>
+  <div class="row">
+    <button id="reload">Reload Data</button>
+    <button id="reset">Start Over</button>
+  </div>
+  <button id="redesign-tpl-btn" style="width:100%;margin-top:6px;padding:9px;border-radius:8px;border:1px solid var(--cy);background:rgba(94,242,255,0.1);color:var(--cy);font-weight:600;font-size:12px;cursor:pointer">
+    🎨 Redesign Master Template in Drive
+  </button>
+</div>
+
+<div id="toast" role="alert"></div>
+
+<div id="wrap">
+  <div id="canvas">
+    <svg id="svg"></svg>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Constants for layout
+const DW = 260;      // Standard decision node width
+const W = 280;       // Leaf card width
+const COL_W = 350;   // Horizontal column spacing
+const ROW_GAP = 70;  // Vertical row gap between stage groups
+const GY = 12;       // Gap between stacked cards
+const PX = 60, PY = 90; // Canvas padding
+
+// Default IDs connecting directly to Google Drive files
+const DEFAULT_TEMPLATE_ID = '1K7SQsluw4uTnA-3aJX_5ezPD5FdfuSM12ezAZMiSSTg';
+const DEFAULT_FOLDER_ID   = '1nzJEQFBS1uV-67mn-KtQJ-d4fZKpVp3A';
+
+const MAT = [
+  'Whiteboard & markers', 'Slides / projector', 'Printed handouts',
+  'Textbook', 'Case study pack', 'Calculators', 'Devices & internet', 'Graph paper'
+];
+
+/**
+ * The Decision Tree Flow:
+ * Phase 1: Curriculum Hierarchy (Strand -> Substrand -> Outcome)
+ * Phase 2: Curriculum Targets (Intention -> Indicator -> Success Criteria)
+ * Phase 3: National Competencies & Shared Values (with Indicators)
+ * Phase 4: Prior Learning, Materials & Pedagogy
+ * Phase 5: Instructional Strategies (Starter, Main Activity, Closure)
+ * Phase 6: Adjustable 35-Minute Timer Balancer
+ * Phase 7: Assessment Tools
+ */
+const FLOW = [
+  // --- Phase 1: Curriculum Hierarchy ---
+  { st: 1, key: 'STRAND', title: 'Strand / Unit', src: 'strands', multi: 0, group: 0, col: 0,
+    hint: 'Select the curriculum strand (Unit) from your syllabus.' },
+  { st: 1, key: 'SUBSTRAND', title: 'Sub-strand', src: 'substrands', multi: 0, group: 0, col: 1, pk: 'STRAND', et: 'h',
+    hint: 'Select the sub-strand under this unit.' },
+  { st: 1, key: 'OUTCOME', title: 'Curriculum Outcome', src: 'outcomes', multi: 1, group: 0, col: 2, pk: 'SUBSTRAND', et: 'h',
+    hint: 'Choose the learning outcome(s) for the week.' },
+
+  // --- Phase 2: Curriculum Targets (fetched directly from sheet) ---
+  { st: 2, key: 'INTENTION', title: 'Learning Intention', src: 'target_intention', multi: 1, group: 1, col: 0, pk: 'OUTCOME', et: 'wrap',
+    hint: 'Syllabus learning intention (confirm or customize).' },
+  { st: 2, key: 'INDICATOR', title: 'Indicator of Learning', src: 'target_indicator', multi: 1, group: 1, col: 1, pk: 'INTENTION', et: 'h',
+    hint: 'Observable evidence demonstrating the outcome.' },
+  { st: 2, key: 'SUCCESS_CRITERIA', title: 'Success Criteria', src: 'target_criteria', multi: 1, group: 1, col: 2, pk: 'INDICATOR', et: 'h',
+    hint: 'How students will show they have met the goals.' },
+
+  // --- Phase 3: Core Attributes (Appear Below, showing indicators) ---
+  { st: 3, key: 'COMPETENCIES', title: 'Key Competencies', src: 'competencies', multi: 1, group: 2, col: 0, pk: 'SUCCESS_CRITERIA', et: 'wrap',
+    hint: 'Select applicable key competencies with classroom indicators (up to 6).' },
+  { st: 3, key: 'VALUES', title: 'Shared Values', src: 'values', multi: 1, group: 2, col: 1, pk: 'COMPETENCIES', et: 'h',
+    hint: 'Select applicable shared values with classroom indicators (up to 5).' },
+
+  // --- Phase 4: Learning Environment & Pedagogy ---
+  { st: 4, key: 'PRIOR_LEARNING', title: 'Prior Learning', text: 'What foundational knowledge do students already bring?', group: 3, col: 0, pk: 'VALUES', et: 'wrap',
+    hint: 'Prior concept connection for student recall.' },
+  { st: 4, key: 'MATERIALS', title: 'Materials Needed', opts: MAT, multi: 1, group: 3, col: 1, pk: 'PRIOR_LEARNING', et: 'h',
+    hint: 'Select resources required for the lessons.' },
+  { st: 4, key: 'PEDAGOGY', title: 'Pedagogy Approach', opts: ['Teacher-centred', 'Student-centred', 'Blended (Teacher & Student)'], multi: 1, group: 3, col: 2, pk: 'MATERIALS', et: 'h',
+    hint: 'Instructional orientation used across activities.' },
+
+  // --- Phase 5: Teaching Strategies (Strict Activity Matching) ---
+  { st: 5, key: 'STARTER', title: 'Starter Strategy', src: 'strategies_starter', multi: 1, group: 4, col: 0, pk: 'PEDAGOGY', et: 'wrap',
+    hint: 'Showing ONLY strategies assigned to Starter activity.' },
+  { st: 5, key: 'MAIN', title: 'Main Activity Strategy', src: 'strategies_main', multi: 1, group: 4, col: 1, pk: 'STARTER', et: 'h',
+    hint: 'Showing ONLY strategies assigned to Main activity.' },
+  { st: 5, key: 'CLOSURE', title: 'Closure Strategy', src: 'strategies_closure', multi: 1, group: 4, col: 2, pk: 'MAIN', et: 'h',
+    hint: 'Showing ONLY strategies assigned to Closure activity.' },
+
+  // --- Phase 6: Time Allocation (35 min Period) ---
+  { st: 6, key: 'TIME_ALLOCATION', title: 'Time Allocation (35 min)', group: 5, col: 1, pk: 'CLOSURE', et: 'v', isTimeBar: true,
+    hint: 'Coupled 35-minute duration. Increasing one activity balances the others.' },
+
+  // --- Phase 7: Assessment ---
+  { st: 7, key: 'ASSESSMENT', title: 'Assessment Tools', src: 'assessments', multi: 1, group: 6, col: 1, pk: 'TIME_ALLOCATION', et: 'v',
+    hint: 'Formative or summative tools to evaluate comprehension.' }
+];
+
+let db = {};
+let G = [];      // Active node groups
+let E = [];      // SVG edges
+let final = null; // Final generation node
+let sel = {};    // Current selections
+
+// Interactive time state (total = 35 mins)
+let times = { starter: 5, main: 25, closure: 5 };
+
+// Load settings from localStorage or defaults
+try {
+  ['tpl', 'folder', 'week', 'grade', 'lessons'].forEach(k => {
+    const v = localStorage.getItem('lt_' + k);
+    if (v) $('#' + k).value = v;
+    $('#' + k).addEventListener('change', e => localStorage.setItem('lt_' + k, e.target.value));
+  });
+} catch (e) {}
+
+if (!$('#tpl').value && DEFAULT_TEMPLATE_ID) $('#tpl').value = DEFAULT_TEMPLATE_ID;
+if (!$('#folder').value && DEFAULT_FOLDER_ID) $('#folder').value = DEFAULT_FOLDER_ID;
+
+function toast(t) {
+  const b = $('#toast');
+  b.textContent = t;
+  b.style.display = 'block';
+}
+$('#toast').onclick = () => { $('#toast').style.display = 'none'; };
+$('#gear').onclick = () => $('#panel').classList.toggle('open');
+
+const by = k => G.find(g => g.d.key === k);
+
+function mk(cls, html) {
+  const el = document.createElement('div');
+  el.className = 'node trim ' + cls;
+  el.innerHTML = html;
+  $('#canvas').appendChild(el);
+  return { el };
+}
+
+function from(n, p) {
+  n.el.style.left = p.el.style.left || '0px';
+  n.el.style.top = p.el.style.top || '0px';
+}
+
+function show(ns) {
+  requestAnimationFrame(() => requestAnimationFrame(() => ns.forEach(n => n.el.classList.remove('trim'))));
+}
+
+function edge(a, b, c, t) {
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  if (c) p.setAttribute('class', 'c');
+  $('#svg').appendChild(p);
+  const e = { a, b, p, t };
+  E.push(e);
+  return e;
+}
+
+/** Draws smooth SVG cubic Bézier curves connecting progressive decisions */
+function draw() {
+  E.forEach(e => {
+    const A = e.a.el, B = e.b.el;
+    const al = A.offsetLeft, at = A.offsetTop, aw = A.offsetWidth, ah = A.offsetHeight;
+    const bl = B.offsetLeft, bt = B.offsetTop, bw = B.offsetWidth, bh = B.offsetHeight;
+    let d;
+
+    if (e.t === 'h') {
+      const x1 = al + aw, y1 = at + ah / 2;
+      const x2 = bl, y2 = bt + bh / 2;
+      const k = Math.max(30, (x2 - x1) / 2);
+      d = `M${x1} ${y1} C${x1 + k} ${y1}, ${x2 - k} ${y2}, ${x2} ${y2}`;
+    } else if (e.t === 'B') {
+      const x1 = al + 24, y1 = at + ah;
+      const x2 = bl, y2 = bt + bh / 2;
+      d = `M${x1} ${y1} C${x1} ${y1 + (y2 - y1) * 0.6}, ${x1 + 10} ${y2}, ${x2} ${y2}`;
+    } else if (e.t === 'v') {
+      const x1 = al + aw / 2, y1 = at + ah;
+      const x2 = bl + bw / 2, y2 = bt;
+      const k = (y2 - y1) / 2;
+      d = `M${x1} ${y1} C${x1} ${y1 + k}, ${x2} ${y2 - k}, ${x2} ${y2}`;
+    } else if (e.t === 'wrap') {
+      const x1 = al + aw / 2, y1 = at + ah;
+      const x2 = bl + bw / 2, y2 = bt;
+      const midY = y1 + (y2 - y1) * 0.5;
+      d = `M${x1} ${y1} C${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+    } else {
+      const x1 = al + aw, y1 = at + ah / 2;
+      const x2 = bl, y2 = bt + bh / 2;
+      d = `M${x1} ${y1} L${x2} ${y2}`;
+    }
+
+    e.p.setAttribute('d', d);
+  });
+}
+
+function animate(ms = 600) {
+  const t = performance.now();
+  (function f() {
+    draw();
+    if (performance.now() - t < ms) requestAnimationFrame(f);
+  })();
+}
+
+/** Dynamic grid layout positioning nodes and child branch cards */
+function layout() {
+  const cv = $('#canvas');
+  void cv.offsetWidth;
+  const H = n => n.el.offsetHeight;
+
+  const totalCols = 3;
+  const availableWidth = $('#wrap').clientWidth || 1200;
+  const ox = Math.max(40, (availableWidth - (totalCols * COL_W)) / 2);
+
+  let mx = 0, my = 0;
+  const set = (n, x, y) => {
+    n.x = x; n.y = y;
+    n.el.style.left = x + 'px';
+    n.el.style.top = y + 'px';
+    mx = Math.max(mx, x + n.el.offsetWidth);
+    my = Math.max(my, y + H(n));
+  };
+
+  const groups = {};
+  G.forEach(g => {
+    const grp = g.d.group != null ? g.d.group : 0;
+    if (!groups[grp]) groups[grp] = [];
+    groups[grp].push(g);
+  });
+
+  let curY = PY;
+  const sortedGroupKeys = Object.keys(groups).map(Number).sort((a, b) => a - b);
+
+  sortedGroupKeys.forEach(grpIdx => {
+    const groupNodes = groups[grpIdx];
+    let maxGroupH = 0;
+
+    groupNodes.forEach(g => {
+      const col = g.d.col != null ? g.d.col : 0;
+      const x = ox + col * COL_W;
+      
+      set(g.dn, x, curY);
+      
+      let leafY = curY + H(g.dn) + GY;
+      g.leaves.forEach(c => {
+        set(c, x + 16, leafY);
+        leafY += H(c) + GY;
+      });
+
+      const nodeTotalH = g.leaves.length ? (leafY - curY) : H(g.dn);
+      maxGroupH = Math.max(maxGroupH, nodeTotalH);
+    });
+
+    curY += maxGroupH + ROW_GAP;
+  });
+
+  if (final) {
+    const x = ox + 1 * COL_W;
+    set(final, x, curY);
+    curY += H(final) + ROW_GAP;
+  }
+
+  const w = Math.max(mx + PX, availableWidth);
+  const h = Math.max(my + PY, curY);
+
+  cv.style.width = w + 'px';
+  cv.style.height = h + 'px';
+  $('#svg').setAttribute('width', w);
+  $('#svg').setAttribute('height', h);
+
+  animate();
+}
+
+function focusOn(n) {
+  $('#wrap').scrollTo({
+    left: Math.max(0, n.x - 140),
+    top: Math.max(0, n.y - 100),
+    behavior: 'smooth'
+  });
+}
+
+function hud() {
+  if (final) {
+    $('#stage-num').textContent = 'Final';
+    $('#stage-text').textContent = 'Generate Lesson Plan';
+    $('#dots').innerHTML = [1, 2, 3, 4, 5, 6, 7].map(i => `<i class="d"></i>`).join('') + '<i class="n"></i>';
+    return;
+  }
+  const curG = G[G.length - 1];
+  if (!curG) return;
+  const curStage = curG.d.st;
+  $('#stage-num').textContent = `Step ${curStage}`;
+  $('#stage-text').textContent = curG.d.title;
+  $('#dots').innerHTML = [1, 2, 3, 4, 5, 6, 7].map(i =>
+    `<i class="${i < curStage ? 'd' : i === curStage ? 'n' : ''}"></i>`
+  ).join('');
+}
+
+/**
+ * Coupled 3-Activity Time Balancer:
+ * Automatically rebalances times so Starter + Main + Closure === 35 minutes always.
+ */
+function adjustTime(changedKey, newVal) {
+  newVal = parseInt(newVal, 10);
+  if (isNaN(newVal)) return;
+
+  const mins = { starter: 2, main: 15, closure: 2 };
+  const maxs = { starter: 15, main: 30, closure: 12 };
+
+  newVal = Math.max(mins[changedKey], Math.min(maxs[changedKey], newVal));
+  const delta = newVal - times[changedKey];
+  if (delta === 0) return;
+
+  times[changedKey] = newVal;
+
+  const others = ['starter', 'main', 'closure'].filter(k => k !== changedKey);
+  const targetOrder = (changedKey === 'main')
+    ? ['starter', 'closure']
+    : (others.includes('main') ? ['main', others.find(k => k !== 'main')] : others);
+
+  let remainingDelta = -delta;
+  for (let k of targetOrder) {
+    const avail = (remainingDelta < 0)
+      ? (times[k] - mins[k])
+      : (maxs[k] - times[k]);
+
+    if (remainingDelta < 0) {
+      const reduce = Math.min(-remainingDelta, avail);
+      times[k] -= reduce;
+      remainingDelta += reduce;
+    } else {
+      const add = Math.min(remainingDelta, avail);
+      times[k] += add;
+      remainingDelta -= add;
+    }
+    if (remainingDelta === 0) break;
+  }
+
+  if (remainingDelta !== 0) {
+    times[changedKey] -= (-remainingDelta);
+  }
+
+  updateTimeUI();
+}
+
+function updateTimeUI() {
+  const sW = (times.starter / 35) * 100;
+  const mW = (times.main / 35) * 100;
+  const cW = (times.closure / 35) * 100;
+
+  // Update triple-colour overview strip widths (no text)
+  const segS = document.querySelector('.seg-starter');
+  const segM = document.querySelector('.seg-main');
+  const segC = document.querySelector('.seg-closure');
+  if (segS) segS.style.width = sW.toFixed(1) + '%';
+  if (segM) segM.style.width = mW.toFixed(1) + '%';
+  if (segC) segC.style.width = cW.toFixed(1) + '%';
+
+  // Update minute labels
+  document.querySelectorAll('.val-starter').forEach(e => e.textContent = times.starter + 'm');
+  document.querySelectorAll('.val-main').forEach(e => e.textContent = times.main + 'm');
+  document.querySelectorAll('.val-closure').forEach(e => e.textContent = times.closure + 'm');
+
+  // Update slider track fill gradients (coloured fill, no thumb)
+  const sliderColors = {
+    starter: { min: 2,  max: 15, c1: '#4ef2bb', c2: '#5ef2ff' },
+    main:    { min: 15, max: 30, c1: '#8b7bff',  c2: '#b39ddb' },
+    closure: { min: 2,  max: 12, c1: '#ffc107',  c2: '#ffd166' }
+  };
+  ['starter', 'main', 'closure'].forEach(k => {
+    const slider = document.querySelector(`input.time-slider[data-act="${k}"]`);
+    if (!slider) return;
+    slider.value = times[k];
+    const { min, max, c1, c2 } = sliderColors[k];
+    const pct = ((times[k] - min) / (max - min) * 100).toFixed(1);
+    slider.style.background = `linear-gradient(90deg, ${c1} 0%, ${c2} ${pct}%, rgba(255,255,255,0.1) ${pct}%, rgba(255,255,255,0.1) 100%)`;
+  });
+
+  // Keep preset pill active state in sync
+  document.querySelectorAll('.preset-pill').forEach(btn => {
+    const match = parseInt(btn.dataset.s, 10) === times.starter &&
+                  parseInt(btn.dataset.m, 10) === times.main &&
+                  parseInt(btn.dataset.c, 10) === times.closure;
+    btn.classList.toggle('active', match);
+  });
+}
+
+/** Formats indicator bullet points cleanly */
+function formatIndicatorText(txt) {
+  if (!txt) return '';
+  return txt
+    .replace(/\s*-\s*Evident when/gi, '\n• Evident when')
+    .replace(/^• /, '')
+    .trim();
+}
+
+/** Fetches items for the current decision node based on previous selections */
+function itemsFor(src) {
+  const schemeVal = $('#scheme').value;
+  const allCurriculum = (db.outcomes || []).filter(x => {
+    return !schemeVal || !x.scheme || x.scheme === schemeVal;
+  });
+
+  // 1. STRANDS
+  if (src === 'strands') {
+    const map = new Map();
+    allCurriculum.forEach(x => {
+      const strand = x.strand || x.unit || 'Standard Unit';
+      if (!map.has(strand)) {
+        map.set(strand, { label: strand, sub: 'Unit Strand', row: x.row });
+      }
+    });
+    return Array.from(map.values());
+  }
+
+  // 2. SUBSTRANDS
+  if (src === 'substrands') {
+    const chosenStrand = (sel.STRAND && sel.STRAND[0]) || '';
+    const map = new Map();
+    allCurriculum
+      .filter(x => !chosenStrand || x.strand === chosenStrand || x.unit === chosenStrand)
+      .forEach(x => {
+        const sub = x.substrand || 'General';
+        if (!map.has(sub)) {
+          map.set(sub, { label: sub, sub: 'Sub-strand', row: x.row });
+        }
+      });
+    return Array.from(map.values());
+  }
+
+  // 3. OUTCOMES
+  if (src === 'outcomes') {
+    const chosenSub = (sel.SUBSTRAND && sel.SUBSTRAND[0]) || '';
+    const chosenStrand = (sel.STRAND && sel.STRAND[0]) || '';
+    const filtered = allCurriculum.filter(x => {
+      const matchStrand = !chosenStrand || x.strand === chosenStrand || x.unit === chosenStrand;
+      const matchSub = !chosenSub || x.substrand === chosenSub;
+      return matchStrand && matchSub;
+    });
+
+    return filtered.map(x => ({
+      label: x.outcome || x.label,
+      sub: x.indicator ? `Indicator: ${x.indicator}` : '',
+      row: x.row,
+      item: x
+    }));
+  }
+
+  // 4. LEARNING TARGETS
+  const selectedOutcomeNames = sel.OUTCOME || [];
+  const matchedOutcomes = allCurriculum.filter(x => selectedOutcomeNames.includes(x.outcome || x.label));
+
+  if (src === 'target_intention') {
+    const set = new Set();
+    const items = [];
+    matchedOutcomes.forEach(x => {
+      const val = x.intention || (x.row && (x.row.Intension || x.row.Intention));
+      if (val && !set.has(val)) {
+        set.add(val);
+        items.push({ label: val, tag: 'From Syllabus', isPre: true });
+      }
+    });
+    if (!items.length) items.push({ label: 'Understand core concept and key principles', tag: 'Default Intention', isPre: true });
+    return items;
+  }
+
+  if (src === 'target_indicator') {
+    const set = new Set();
+    const items = [];
+    matchedOutcomes.forEach(x => {
+      const val = x.indicator || (x.row && x.row.Indicator);
+      if (val && !set.has(val)) {
+        set.add(val);
+        items.push({ label: val, tag: 'From Syllabus', isPre: true });
+      }
+    });
+    if (!items.length) items.push({ label: 'Students accurately explain and apply concepts', tag: 'Default Indicator', isPre: true });
+    return items;
+  }
+
+  if (src === 'target_criteria') {
+    const set = new Set();
+    const items = [];
+    matchedOutcomes.forEach(x => {
+      const val = x.successCriteria || (x.row && (x.row.SuccessCriteria || x.row.Criteria));
+      if (val && !set.has(val)) {
+        set.add(val);
+        items.push({ label: val, tag: 'From Syllabus', isPre: true });
+      }
+    });
+    if (!items.length) items.push({ label: 'I can define the core terms and solve sample questions', tag: 'Default Criteria', isPre: true });
+    return items;
+  }
+
+  // 5. KEY COMPETENCIES (Displaying detailed indicators)
+  if (src === 'competencies') {
+    return (db.competencies || []).map(x => ({
+      label: x.label,
+      indicator: x.indicator || x.sub || '',
+      sub: formatIndicatorText(x.indicator || x.sub || ''),
+      tag: 'Competency'
+    }));
+  }
+
+  // 6. SHARED VALUES (Displaying detailed indicators)
+  if (src === 'values') {
+    return (db.values || []).map(x => ({
+      label: x.label,
+      indicator: x.indicator || x.sub || '',
+      sub: formatIndicatorText(x.indicator || x.sub || ''),
+      tag: 'Shared Value'
+    }));
+  }
+
+  // 7. TEACHING STRATEGIES (Strict Activity Matching: Starter, Main, Closure)
+  const strats = db.strategies || [];
+
+  if (src === 'strategies_starter') {
+    return strats.filter(s => {
+      const act = String(s.activity || (s.row && (s.row.Activity || s.row.StarterClosure)) || '').trim().toLowerCase();
+      return act === 'starter' || /^starter/i.test(act);
+    }).map(s => ({
+      label: s.label || s.name,
+      sub: s.sub || s.procedure,
+      tag: 'Starter',
+      row: s.row
+    }));
+  }
+
+  if (src === 'strategies_main') {
+    return strats.filter(s => {
+      const act = String(s.activity || (s.row && (s.row.Activity || s.row.StarterClosure)) || '').trim().toLowerCase();
+      return act === 'main' || /^main/i.test(act);
+    }).map(s => ({
+      label: s.label || s.name,
+      sub: s.sub || s.procedure,
+      tag: s.approach ? `Main · ${s.approach}` : 'Main Activity',
+      row: s.row
+    }));
+  }
+
+  if (src === 'strategies_closure') {
+    return strats.filter(s => {
+      const act = String(s.activity || (s.row && (s.row.Activity || s.row.StarterClosure)) || '').trim().toLowerCase();
+      return act === 'closure' || /^clos/i.test(act);
+    }).map(s => ({
+      label: s.label || s.name,
+      sub: s.sub || s.procedure,
+      tag: 'Closure',
+      row: s.row
+    }));
+  }
+
+  // 8. ASSESSMENTS
+  if (src === 'assessments') {
+    return (db.assessments || []).map(x => {
+      const type = x.type || (x.row && (x.row.Type || x.row.Category)) || '';
+      return {
+        label: x.label,
+        sub: x.sub || x.description,
+        tag: type || 'Formative',
+        row: x.row
+      };
+    }).sort((a, b) => (a.tag || '').localeCompare(b.tag || ''));
+  }
+
+  return db[src] || [];
+}
+
+/** Opens a decision node group */
+function openGroup(gi) {
+  if (gi >= FLOW.length) return openFinal();
+  const d = FLOW[gi];
+  const g = { d, leaves: [], done: false };
+  G[gi] = g;
+
+  if (d.isTimeBar) {
+    g.dn = mk('dn wide', `
+      <span class="pill">Step ${d.st}</span>
+      <b>${esc(d.title)}</b>
+
+      <div class="time-widget">
+        <!-- Triple-colour overview strip (no text) -->
+        <div class="time-track">
+          <div class="time-seg seg-starter" style="width:14.3%"></div>
+          <div class="time-seg seg-main"    style="width:71.4%"></div>
+          <div class="time-seg seg-closure" style="width:14.3%"></div>
+        </div>
+
+        <!-- Starter card -->
+        <div class="time-card">
+          <div class="time-card-top">
+            <span class="time-card-label">Starter</span>
+            <span class="time-card-val val-starter">${times.starter}m</span>
+          </div>
+          <input type="range" class="time-slider" min="2" max="15" value="${times.starter}" data-act="starter">
+        </div>
+
+        <!-- Main Activity card -->
+        <div class="time-card">
+          <div class="time-card-top">
+            <span class="time-card-label">Main Activity</span>
+            <span class="time-card-val val-main">${times.main}m</span>
+          </div>
+          <input type="range" class="time-slider" min="15" max="30" value="${times.main}" data-act="main">
+        </div>
+
+        <!-- Closure card -->
+        <div class="time-card">
+          <div class="time-card-top">
+            <span class="time-card-label">Closure</span>
+            <span class="time-card-val val-closure">${times.closure}m</span>
+          </div>
+          <input type="range" class="time-slider" min="2" max="12" value="${times.closure}" data-act="closure">
+        </div>
+
+        <!-- Preset suggestions -->
+        <div class="time-presets">
+          <button class="preset-pill active" data-s="5" data-m="25" data-c="5">5 / 25 / 5 Standard</button>
+          <button class="preset-pill" data-s="7" data-m="23" data-c="5">7 / 23 / 5 Hook</button>
+          <button class="preset-pill" data-s="5" data-m="22" data-c="8">5 / 22 / 8 Reflection</button>
+          <button class="preset-pill" data-s="10" data-m="20" data-c="5">10 / 20 / 5 Deep Intro</button>
+        </div>
+      </div>
+
+      <button class="go" style="visibility:visible">Confirm 35-Minute Allocation</button>
+    `);
+
+    g.dn.el.querySelectorAll('.time-slider').forEach(slider => {
+      slider.oninput = e => adjustTime(e.target.dataset.act, e.target.value);
+    });
+
+    g.dn.el.querySelectorAll('.step-btn').forEach(btn => {
+      btn.onclick = () => {
+        const act = btn.dataset.act;
+        const dir = parseInt(btn.dataset.dir, 10);
+        adjustTime(act, times[act] + dir);
+      };
+    });
+
+    g.dn.el.querySelectorAll('.preset-pill').forEach(btn => {
+      btn.onclick = () => {
+        times.starter = parseInt(btn.dataset.s, 10);
+        times.main = parseInt(btn.dataset.m, 10);
+        times.closure = parseInt(btn.dataset.c, 10);
+        updateTimeUI();
+      };
+    });
+
+    g.dn.btn = g.dn.el.querySelector('.go');
+    g.dn.btn.onclick = () => {
+      sel.TIME_ALLOCATION = [Object.assign({}, times)];
+      confirmG(g);
+    };
+
+    if (d.pk) {
+      const parentNode = by(d.pk).dn;
+      from(g.dn, parentNode);
+      edge(parentNode, g.dn, 1, d.et || 'v');
+    }
+    
+    hud();
+    layout();
+    show([g.dn]);
+    setTimeout(() => { focusOn(g.dn); updateTimeUI(); }, 60);
+    return;
+  }
+
+  // 2. Standard Decision Parent Node
+  g.dn = mk('dn', `
+    <span class="pill">Step ${d.st}</span>
+    <b>${esc(d.title)}</b>
+    <span class="hint">${esc(d.hint || '')}</span>
+    ${d.text ? `<textarea placeholder="${esc(d.text)}" aria-label="${esc(d.title)}"></textarea>` : ''}
+    <button class="go">${d.multi ? 'Confirm &amp; Trim' : 'Confirm Selection'}</button>
+  `);
+
+  g.dn.btn = g.dn.el.querySelector('.go');
+  g.dn.btn.onclick = () => confirmG(g);
+
+  if (d.text) {
+    g.ta = g.dn.el.querySelector('textarea');
+    g.ta.oninput = () => upd(g);
+  }
+
+  if (d.pk) {
+    const parentNode = by(d.pk).dn;
+    from(g.dn, parentNode);
+    edge(parentNode, g.dn, 1, d.et || 'h');
+  } else {
+    g.dn.el.style.left = PX + 'px';
+    g.dn.el.style.top = PY + 'px';
+  }
+
+  // Generate branch leaves
+  const items = d.text ? [] : (d.opts ? d.opts.map(o => ({ label: o })) : itemsFor(d.src));
+
+  items.forEach(it => {
+    const n = mk('card', `
+      <div class="title">${esc(it.label)}</div>
+      ${it.sub ? `<div class="desc">${esc(it.sub)}</div>` : ''}
+      ${it.tag ? `<small class="tg">${esc(it.tag)}</small>` : ''}
+    `);
+
+    n.label = it.label;
+    n.indicator = it.indicator || it.sub || '';
+    n.on = !!it.isPre;
+    if (n.on) n.el.classList.add('on');
+
+    n.el.tabIndex = 0;
+    n.el.setAttribute('role', 'button');
+    n.el.onclick = () => pick(g, n);
+    n.el.onkeydown = e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        pick(g, n);
+      }
+    };
+
+    from(n, g.dn);
+    g.leaves.push(n);
+    edge(g.dn, n, 0, 'B');
+  });
+
+  if (!d.text && !items.length) {
+    g.dn.el.insertAdjacentHTML('beforeend', `<small class="note">No matching options found in sheet.</small>`);
+  } else {
+    upd(g);
+  }
+
+  hud();
+  layout();
+  show([g.dn].concat(g.leaves));
+  setTimeout(() => focusOn(g.dn), 60);
+}
+
+function pick(g, n) {
+  if (g.d.multi) {
+    n.on = !n.on;
+  } else {
+    g.leaves.forEach(c => c.on = (c === n));
+  }
+  g.leaves.forEach(c => c.el.classList.toggle('on', c.on));
+  upd(g);
+}
+
+function upd(g) {
+  const ready = g.d.text
+    ? (g.ta.value.trim().length > 0)
+    : (g.leaves.some(c => c.on));
+  g.dn.el.classList.toggle('ready', ready);
+}
+
+function confirmG(g) {
+  const gi = G.indexOf(g);
+  const keep = g.leaves.filter(c => c.on);
+  const drop = g.leaves.filter(c => !c.on);
+
+  if (!g.d.isTimeBar) {
+    sel[g.d.key] = g.d.text
+      ? [g.ta.value.trim()]
+      : keep.map(c => c.label);
+
+    // Save details for competencies and values
+    if (g.d.key === 'COMPETENCIES') {
+      sel.COMPETENCY_DETAILS = keep.map(c => c.indicator || '');
+    }
+    if (g.d.key === 'VALUES') {
+      sel.VALUES_DETAILS = keep.map(c => c.indicator || '');
+    }
+  }
+
+  g.dn.btn.disabled = true;
+
+  // Visual trimming animation
+  drop.forEach(c => c.el.classList.add('trim'));
+  E.filter(e => drop.includes(e.b)).forEach(e => e.p.classList.add('gone'));
+
+  if (gi === 0) $('#scheme').disabled = true;
+
+  setTimeout(() => {
+    drop.forEach(c => c.el.remove());
+    E = E.filter(e => {
+      if (drop.includes(e.b)) { e.p.remove(); return false; }
+      return true;
+    });
+
+    E.filter(e => keep.includes(e.b)).forEach(e => e.p.setAttribute('class', 'c'));
+    keep.forEach(c => {
+      c.el.onclick = null;
+      c.el.onkeydown = null;
+      c.el.tabIndex = -1;
+    });
+
+    if (g.ta) g.ta.readOnly = true;
+    g.leaves = keep;
+    g.done = true;
+    g.dn.el.classList.add('done');
+
+    openGroup(gi + 1);
+  }, (g.d.text || g.d.isTimeBar) ? 0 : 420);
+}
+
+function openFinal() {
+  const parentNode = G[G.length - 1].dn;
+  final = mk('final', `
+    <h3 style="margin:0 0 8px;font-size:15px;color:var(--cy)">Decision Tree Complete</h3>
+    <p style="font-size:12px;color:var(--mut);margin:0 0 14px">35-minute plan structure is locked and ready.</p>
+    <button class="go" id="gen">Generate Weekly Plan File</button>
+    <p id="msg"></p>
+  `);
+
+  from(final, parentNode);
+  edge(parentNode, final, 1, 'v');
+  $('#gen').onclick = generate;
+
+  hud();
+  layout();
+  show([final]);
+  setTimeout(() => focusOn(final), 60);
+}
+
+function generate() {
+  const tpl = $('#tpl').value.trim();
+  const folder = $('#folder').value.trim();
+  const msg = $('#msg');
+  const btn = $('#gen');
+
+  if (!tpl) {
+    $('#panel').classList.add('open');
+    $('#tpl').focus();
+    toast('Please configure the Master Template File ID in settings first.');
+    return;
+  }
+
+  if (typeof google === 'undefined' || !google.script) {
+    toast('File generation runs inside your Apps Script web app. (Preview mode active).');
+    return;
+  }
+
+  const n = parseInt($('#lessons').value, 10) || Math.max(1, (sel.OUTCOME || []).length);
+  btn.disabled = true;
+  msg.className = '';
+  msg.textContent = 'Generating Google Sheets weekly plan…';
+  layout();
+
+  google.script.run
+    .withSuccessHandler(r => {
+      msg.innerHTML = `
+        <div style="margin-top:6px;font-size:13px;color:var(--green);font-weight:600">✓ Plan Created Successfully!</div>
+        <a href="${esc(r.url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:14px">
+          Open ${esc(r.name)} ↗
+        </a>
+        <div style="font-size:11.5px;color:var(--mut);margin-top:4px">(${r.lessons} lesson tabs populated · 35 min balance)</div>
+        ${r.note ? `<div style="font-size:11px;color:var(--gold);margin-top:4px">${esc(r.note)}</div>` : ''}
+      `;
+      btn.disabled = false;
+      layout();
+    })
+    .withFailureHandler(e => {
+      msg.className = 'err';
+      msg.textContent = 'Could not create file: ' + e.message;
+      btn.disabled = false;
+      layout();
+    })
+    .generateWeeklyPlanFile({
+      templateId: tpl,
+      folderId: folder,
+      scheme: $('#scheme').value,
+      week: $('#week').value.trim(),
+      grade: $('#grade').value.trim(),
+      lessons: n,
+      times: times,
+      selections: sel
+    });
+}
+
+function start() {
+  $('#panel').classList.remove('open');
+  document.querySelectorAll('.node').forEach(n => n.remove());
+  $('#svg').innerHTML = '';
+  G = [];
+  E = [];
+  sel = {};
+  final = null;
+  $('#scheme').disabled = false;
+  openGroup(0);
+}
+
+/** Initializes the planner by fetching real database sheets via Apps Script */
+function init() {
+  $('#panel').classList.remove('open');
+  $('#toast').style.display = 'none';
+
+  if (typeof google === 'undefined' || !google.script) {
+    // Development / Offline Preview Data modeled exactly after your sheet
+    db = {
+      schemes: [{ label: 'Economics' }, { label: 'Business' }],
+      outcomes: [
+        {
+          strand: '4.6 Employment and unemployment',
+          unit: '4.6 Employment and unemployment',
+          substrand: '4.6.1 Definitions of employment, unemployment and full employment',
+          outcome: 'To define employment, unemployment and full employment',
+          indicator: 'To define employment, unemployment and full employment',
+          intention: 'To write definition of employment and unemployment',
+          successCriteria: 'To define employment and unemployment',
+          scheme: 'Economics',
+          row: {}
+        },
+        {
+          strand: '4.6 Employment and unemployment',
+          unit: '4.6 Employment and unemployment',
+          substrand: '4.6.2 Measurement of unemployment',
+          outcome: 'To explore how unemployment is measured (labour force survey)',
+          indicator: 'To explain how unemployment is measured (labour force survey)',
+          intention: 'To write how unemployment is measured (labour force survey)',
+          successCriteria: 'To write how unemployment is measured (labour force survey)',
+          scheme: 'Economics',
+          row: {}
+        },
+        {
+          strand: '4.6 Employment and unemployment',
+          unit: '4.6 Employment and unemployment',
+          substrand: '4.6.2 Measurement of unemployment',
+          outcome: 'To explore the formula for the unemployment rate',
+          indicator: 'To calculate the unemployment rate',
+          intention: 'To calculate for the unemployment rate',
+          successCriteria: 'To calculate using the formula for the unemployment rate',
+          scheme: 'Economics',
+          row: {}
+        }
+      ],
+      values: [
+        {
+          label: 'Values related to self',
+          indicator: '- Evident when students complete assessments independently without copying\n- Evident when students express personal opinions with confidence\n- Evident when students clean workstations responsibly'
+        },
+        {
+          label: 'Values related to others',
+          indicator: '- Evident when students offer help to struggling classmates\n- Evident when students share group resources fairly\n- Evident when students listen quietly while others speak'
+        },
+        {
+          label: 'Values related to the local and global community',
+          indicator: '- Evident when students share valuable ideas during class discussions\n- Evident when students speak up against unfairness or bullying\n- Evident when students respect different cultures'
+        },
+        {
+          label: 'Values related to the environment',
+          indicator: '- Evident when students treat plants and habitats with care\n- Evident when students turn off lights and conserve resources'
+        }
+      ],
+      competencies: [
+        {
+          label: 'Practicing Islam:',
+          indicator: '- Evident when students open and close interactions using Islamic greetings\n- Evident when students demonstrate Islamic values of honesty and kindness'
+        },
+        {
+          label: 'Understanding & managing self:',
+          indicator: '- Evident when students manage time effectively to complete independent tasks\n- Evident when students monitor behavior and concentration during challenging tasks'
+        },
+        {
+          label: 'Living a healthy life:',
+          indicator: '- Evident when students maintain correct ergonomics and safety procedures\n- Evident when students evaluate healthy daily habits'
+        },
+        {
+          label: 'Relating to people:',
+          indicator: '- Evident when students listen actively without interrupting\n- Evident when students resolve peer disagreements using peaceful communication'
+        },
+        {
+          label: 'Thinking critically & creatively:',
+          indicator: '- Evident when students question assumptions, analyze evidence, and examine multiple perspectives\n- Evident when students generate creative solutions'
+        },
+        {
+          label: 'Making meaning:',
+          indicator: '- Evident when students interpret charts, graphs, and subject-specific symbols accurately\n- Evident when students select appropriate vocabulary to present ideas clearly'
+        },
+        {
+          label: 'Using technology & media:',
+          indicator: '- Evident when students execute targeted digital searches\n- Evident when students critically verify source credibility and online bias'
+        },
+        {
+          label: 'Using sustainable practices:',
+          indicator: '- Evident when students minimize waste by economizing materials\n- Evident when students propose sustainable solutions to environmental issues'
+        }
+      ],
+      strategies: [
+        // Starters (Strictly Activity === 'Starter')
+        { label: 'The Hook', sub: 'Present the Stimulus: Display an intriguing image or 30s audio trigger without revealing the topic.', activity: 'Starter' },
+        { label: 'KWL Chart', sub: 'Track what students Know and Want to know before diving into the lesson.', activity: 'Starter' },
+        { label: 'Scaffolding / Prior-Knowledge Activation', sub: 'Review foundational knowledge to prepare students for new concepts.', activity: 'Starter' },
+        { label: 'Think-Pair-Share', sub: 'Pose an opening prompt for individual thought, partner dialogue, and class share.', activity: 'Starter' },
+        { label: 'Entrance Ticket', sub: 'Short prompt answered at start of class to activate prior learning.', activity: 'Starter' },
+        { label: 'Four Corners', sub: 'Students physically move to designated corners based on their stance or answer.', activity: 'Starter' },
+        
+        // Mains (Strictly Activity === 'Main')
+        { label: 'Direct Instruction', sub: 'Systematically guides students through step-by-step demonstrations and modeling.', activity: 'Main', approach: 'Teacher-centred' },
+        { label: 'The Lecture Method', sub: 'Verbally presents formatted content, facts, or conceptual frameworks.', activity: 'Main', approach: 'Teacher-centred' },
+        { label: 'Expository Teaching', sub: 'Advance organizer followed by logical deductive content presentation.', activity: 'Main', approach: 'Teacher-centred' },
+        { label: 'Demonstration Method', sub: 'Step-by-step modeling of a process or experiment before student execution.', activity: 'Main', approach: 'Teacher-centred' },
+        { label: 'Jigsaw Technique', sub: 'Expert groups master content and teach home peers.', activity: 'Main', approach: 'Student-centred' },
+        { label: 'Inquiry-Based Learning (5E Model)', sub: 'Engage, Explore, Explain, Elaborate, and Evaluate.', activity: 'Main', approach: 'Student-centred' },
+
+        // Closures (Strictly Activity === 'Closure')
+        { label: 'Exit Ticket', sub: 'Short targeted prompt answered before leaving.', activity: 'Closure' },
+        { label: '3-2-1 Reflection', sub: '3 key takeaways, 2 connections, 1 remaining question.', activity: 'Closure' },
+        { label: 'KWL', sub: 'Final reflection on what students Learned during the period.', activity: 'Closure' },
+        { label: 'Elevator Pitch', sub: '60-second concise synthesis of the lesson essence.', activity: 'Closure' },
+        { label: 'Gallery Walk', sub: 'Students circulate the room reviewing peer artifacts and recording reflections.', activity: 'Closure' },
+        { label: 'Snowball Toss', sub: 'Students write a key takeaway on paper, toss it, and read a peer response.', activity: 'Closure' }
+      ],
+      assessments: [
+        { label: 'Exit & Entry Tickets', sub: 'Short prompts answered at start or end of class.', type: 'Formative Assessment' },
+        { label: 'In-Class Digital Polling', sub: 'Live interactive quizzes (Kahoot, Mentimeter) for instant feedback.', type: 'Formative Assessment' },
+        { label: 'Whiteboard Response Checks', sub: 'Quick answers held up simultaneously.', type: 'Formative Assessment' },
+        { label: 'Unit Tests', sub: 'Formal evaluation across multiple topics.', type: 'Summative Assessment' }
+      ]
+    };
+
+    $('#scheme').innerHTML = '<option value="Economics">Economics</option><option value="Business">Business</option>';
+    toast('Previewing with sample database. Your live Google Sheets load automatically when deployed on Apps Script.');
+    start();
+    return;
+  }
+
+  // Live Apps Script Data Retrieval
+  google.script.run
+    .withSuccessHandler(r => {
+      db = r.data;
+      const schemes = (db.schemes && db.schemes.length) ? db.schemes : [{ label: 'Economics' }];
+      $('#scheme').innerHTML = schemes.map(s => `<option value="${esc(s.label)}">${esc(s.label)}</option>`).join('');
+      if (r.missing && r.missing.length) {
+        toast('Notice: Missing sheet tabs: ' + r.missing.join(', '));
+      }
+      start();
+    })
+    .withFailureHandler(e => toast('Could not read spreadsheet database: ' + e.message))
+    .getDatabase();
+}
+
+$('#reload').onclick = init;
+$('#reset').onclick = start;
+$('#redesign-tpl-btn').onclick = () => {
+  const tpl = $('#tpl').value.trim() || DEFAULT_TEMPLATE_ID;
+  const btn = $('#redesign-tpl-btn');
+  btn.disabled = true;
+  btn.textContent = 'Applying Executive Design to Template…';
+  if (typeof google === 'undefined' || !google.script) {
+    toast('Master template redesign runs live inside your Apps Script web app.');
+    btn.disabled = false;
+    btn.textContent = '🎨 Redesign Master Template in Drive';
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(r => {
+      toast('✓ Master template successfully redesigned with executive layout!');
+      btn.disabled = false;
+      btn.textContent = '✓ Master Template Redesigned';
+      setTimeout(() => { btn.textContent = '🎨 Redesign Master Template in Drive'; }, 3500);
+    })
+    .withFailureHandler(e => {
+      toast('Could not redesign template: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '🎨 Redesign Master Template in Drive';
+    })
+    .redesignMasterTemplate(tpl);
+};
+$('#scheme').onchange = () => {
+  if (G.length <= 1 && (!G[0] || !G[0].done)) start();
+};
+window.addEventListener('resize', () => {
+  if (G.length) layout();
+});
+
+init();
+</script>
+</body>
+</html>
