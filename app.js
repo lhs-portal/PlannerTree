@@ -352,20 +352,17 @@ function adjustTime(changedKey, newVal) {
 }
 
 function updateTimeUI() {
-  const sW = (times.starter / 35) * 100;
-  const mW = (times.main / 35) * 100;
-  const cW = (times.closure / 35) * 100;
-
-  const segS = $('.seg-starter');
-  const segM = $('.seg-main');
-  const segC = $('.seg-closure');
-  if (segS) { segS.style.width = sW + '%'; segS.innerHTML = `<span>Starter ${times.starter}m</span>`; }
-  if (segM) { segM.style.width = mW + '%'; segM.innerHTML = `<span>Main ${times.main}m</span>`; }
-  if (segC) { segC.style.width = cW + '%'; segC.innerHTML = `<span>Closure ${times.closure}m</span>`; }
-
   ['starter', 'main', 'closure'].forEach(k => {
+    const seg = $(`.ta-${k}`);
+    if (seg) seg.style.width = (times[k] / 35 * 100) + '%';
+
     const slider = $(`input.time-slider[data-act="${k}"]`);
-    if (slider) slider.value = times[k];
+    if (slider) {
+      slider.value = times[k];
+      const mn = +slider.min, mx = +slider.max;
+      slider.style.setProperty('--fill', ((times[k] - mn) / (mx - mn) * 100) + '%');
+    }
+
     const valSpan = $(`.val-${k}`);
     if (valSpan) valSpan.textContent = times[k] + 'm';
   });
@@ -569,41 +566,30 @@ function openGroup(gi) {
 
   // 1. Time Balancer Node
   if (d.isTimeBar) {
+    const TA_ROWS = [
+      { k: 'starter', name: 'Starter',       min: 2,  max: 15 },
+      { k: 'main',    name: 'Main Activity', min: 15, max: 30 },
+      { k: 'closure', name: 'Closure',       min: 2,  max: 12 },
+    ];
+
     g.dn = mk('dn wide', `
-      <span class="pill">Step ${d.st}</span>
-      <b>${esc(d.title)}</b>
-      <span class="hint">${esc(d.hint || '')}</span>
-      
-      <div class="time-widget">
-        <div class="time-track">
-          <div class="time-seg seg-starter" style="width: 14.3%;"><span>Starter 5m</span></div>
-          <div class="time-seg seg-main" style="width: 71.4%;"><span>Main 25m</span></div>
-          <div class="time-seg seg-closure" style="width: 14.3%;"><span>Closure 5m</span></div>
+      <b>Time Allocation</b>
+
+      <div class="ta">
+        <div class="ta-bar">
+          <i class="ta-seg ta-starter" style="width:${times.starter / 35 * 100}%"></i>
+          <i class="ta-seg ta-main" style="width:${times.main / 35 * 100}%"></i>
+          <i class="ta-seg ta-closure" style="width:${times.closure / 35 * 100}%"></i>
         </div>
 
-        <div class="time-row">
-          <div class="time-label"><span class="dot dot-starter"></span><b>Starter</b></div>
-          <button class="step-btn" data-act="starter" data-dir="-1">-</button>
-          <input type="range" class="time-slider" min="2" max="15" value="${times.starter}" data-act="starter">
-          <button class="step-btn" data-act="starter" data-dir="1">+</button>
-          <span class="time-val val-starter">${times.starter}m</span>
-        </div>
-
-        <div class="time-row">
-          <div class="time-label"><span class="dot dot-main"></span><b>Main Activity</b></div>
-          <button class="step-btn" data-act="main" data-dir="-1">-</button>
-          <input type="range" class="time-slider" min="15" max="30" value="${times.main}" data-act="main">
-          <button class="step-btn" data-act="main" data-dir="1">+</button>
-          <span class="time-val val-main">${times.main}m</span>
-        </div>
-
-        <div class="time-row">
-          <div class="time-label"><span class="dot dot-closure"></span><b>Closure</b></div>
-          <button class="step-btn" data-act="closure" data-dir="-1">-</button>
-          <input type="range" class="time-slider" min="2" max="12" value="${times.closure}" data-act="closure">
-          <button class="step-btn" data-act="closure" data-dir="1">+</button>
-          <span class="time-val val-closure">${times.closure}m</span>
-        </div>
+        ${TA_ROWS.map(r => `
+          <div class="ta-row" data-k="${r.k}">
+            <div class="ta-head">
+              <span class="ta-name">${r.name}</span>
+              <span class="time-val val-${r.k}">${times[r.k]}m</span>
+            </div>
+            <input type="range" class="time-slider" min="${r.min}" max="${r.max}" value="${times[r.k]}" data-act="${r.k}" style="--fill:${(times[r.k] - r.min) / (r.max - r.min) * 100}%">
+          </div>`).join('')}
 
         <div class="time-presets">
           <button class="preset-pill active" data-s="5" data-m="25" data-c="5">5 / 25 / 5 Standard</button>
@@ -611,8 +597,6 @@ function openGroup(gi) {
           <button class="preset-pill" data-s="5" data-m="22" data-c="8">5 / 22 / 8 Reflection</button>
           <button class="preset-pill" data-s="10" data-m="20" data-c="5">10 / 20 / 5 Deep Intro</button>
         </div>
-
-        <div class="total-badge">Total: <b id="total-min">35 / 35</b> mins <span class="check-mark">✓</span></div>
       </div>
 
       <button class="go" style="visibility:visible">Confirm 35-Minute Allocation</button>
@@ -620,14 +604,6 @@ function openGroup(gi) {
 
     g.dn.el.querySelectorAll('.time-slider').forEach(slider => {
       slider.oninput = e => adjustTime(e.target.dataset.act, e.target.value);
-    });
-
-    g.dn.el.querySelectorAll('.step-btn').forEach(btn => {
-      btn.onclick = () => {
-        const act = btn.dataset.act;
-        const dir = parseInt(btn.dataset.dir, 10);
-        adjustTime(act, times[act] + dir);
-      };
     });
 
     g.dn.el.querySelectorAll('.preset-pill').forEach(btn => {
