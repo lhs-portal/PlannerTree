@@ -271,126 +271,46 @@ path.gone {
   font-weight: 500;
 }
 
-/* Time Balancer Widget */
-.time-widget {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+/* Time Allocation widget */
+.ta { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 
-.time-track {
-  height: 26px;
-  border-radius: 13px;
+.ta-bar {
+  display: flex; height: 14px; border-radius: 999px; overflow: hidden;
   background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(140, 170, 210, 0.3);
-  display: flex;
-  overflow: hidden;
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
 }
+.ta-seg { display: block; height: 100%; transition: width 0.25s cubic-bezier(0.2, 0.8, 0.3, 1); }
+.ta-starter { background: var(--cy); }
+.ta-main    { background: var(--vi); }
+.ta-closure { background: #ff9f43; }
 
-.time-seg {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
-  color: #04121a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 0 4px;
-  transition: width 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-.seg-starter {
-  background: linear-gradient(90deg, #4ef2bb, var(--cy));
-  box-shadow: 0 0 10px var(--cy-glow);
-}
-
-.seg-main {
-  background: linear-gradient(90deg, var(--vi), #b39ddb);
-  box-shadow: 0 0 10px var(--vi-glow);
-  color: #0d1525;
-}
-
-.seg-closure {
-  background: linear-gradient(90deg, #ffc107, #ffd166);
-  box-shadow: 0 0 10px var(--gold-glow);
-  color: #261600;
-}
-
-.time-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
+.ta-row {
+  --c: var(--cy);
+  padding: 10px 14px 12px; border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
-  padding: 6px 10px;
-  border-radius: 10px;
   border: 1px solid rgba(140, 170, 210, 0.15);
 }
+.ta-row[data-k="main"]    { --c: var(--vi); }
+.ta-row[data-k="closure"] { --c: #ff9f43; }
 
-.time-row .dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.ta-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.ta-name { text-align: left; font-size: 13px; color: var(--mut); }
+.ta .time-val { text-align: right; font-weight: 700; font-size: 14px; color: #fff; }
+
+.ta .time-slider {
+  -webkit-appearance: none; appearance: none;
+  display: block; width: 100%; height: 6px; margin: 0; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(to right, var(--c) var(--fill, 50%), rgba(255, 255, 255, 0.14) var(--fill, 50%));
 }
-
-.dot-starter { background: var(--cy); box-shadow: 0 0 6px var(--cy); }
-.dot-main { background: var(--vi); box-shadow: 0 0 6px var(--vi); }
-.dot-closure { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
-
-.time-row .time-label {
-  width: 92px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 500;
-  color: var(--fg);
+.ta .time-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--c); border: 2px solid var(--bg);
+  box-shadow: 0 0 8px var(--c);
 }
-
-.time-row .step-btn {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: 1px solid rgba(140, 170, 210, 0.3);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--fg);
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: all 0.15s;
+.ta .time-slider::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--c); border: 2px solid var(--bg);
 }
-
-.time-row .step-btn:hover {
-  background: rgba(94, 242, 255, 0.2);
-  border-color: var(--cy);
-}
-
-.time-row .time-slider {
-  flex: 1;
-  height: 4px;
-  accent-color: var(--cy);
-  cursor: pointer;
-}
-
-.time-row .time-val {
-  width: 38px;
-  text-align: right;
-  font-weight: 700;
-  font-size: 12.5px;
-  color: var(--cy);
-}
-
-.val-starter { color: var(--cy); }
-.val-main { color: var(--vi); }
-.val-closure { color: var(--gold); }
 
 .time-presets {
   display: flex;
@@ -424,25 +344,6 @@ path.gone {
   background: rgba(94, 242, 255, 0.16);
   color: #fff;
   font-weight: 600;
-}
-
-.total-badge {
-  text-align: center;
-  font-size: 12px;
-  color: var(--mut);
-  margin-top: 2px;
-  padding: 4px;
-}
-
-.total-badge b {
-  color: var(--green);
-  font-size: 13px;
-  display: inline-block;
-}
-
-.total-badge .check-mark {
-  color: var(--green);
-  font-weight: 700;
 }
 
 /* Final Generation Node */
