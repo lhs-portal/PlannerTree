@@ -42,29 +42,13 @@
       <label class="field">Password
         <input id="authPass" type="password" autocomplete="current-password" placeholder="••••••••" required>
       </label>
-      <label class="field" id="authNameWrap" hidden>Full name
-        <input id="authName" type="text" autocomplete="name" placeholder="Your full name">
-      </label>
-      <label class="field" id="authCodeWrap" hidden>Setup code
-        <input id="authCode" type="text" autocomplete="off" placeholder="Given by the administrator">
-      </label>
-
       <div class="auth-meta">
         <label class="chk"><input id="authRemember" type="checkbox" checked> Keep me signed in</label>
-        <button type="button" id="authToggle" class="linkbtn">Connection</button>
       </div>
 
       <button id="authSubmit" type="submit" class="btn-primary">Sign in</button>
       <p id="authMsg" class="auth-msg" role="status" aria-live="polite"></p>
     </form>
-
-    <div id="authConn" class="auth-conn" hidden>
-      <label class="field">Apps Script Web App URL
-        <input id="authApiUrl" type="url" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
-      </label>
-      <button type="button" id="authConnect" class="btn-ghost">Save &amp; test connection</button>
-      <p class="fineprint">In Apps Script: <b>Deploy → Manage deployments → Web app</b>. Access must allow anyone with the link.</p>
-    </div>
 
     <div class="auth-actions">
       <button type="button" id="authDemo" class="btn-ghost">Preview offline demo</button>
@@ -90,8 +74,6 @@
     <div id="userMenu" hidden>
       <div class="um-head"><b id="umName">—</b><small id="umEmail"></small></div>
       <button id="umInstall" type="button" hidden>⤓ Install app</button>
-      <button id="umUsers" type="button" hidden>Manage users</button>
-      <button id="umPassword" type="button">Change password</button>
       <button id="umSignout" type="button" class="danger">Sign out</button>
     </div>
   </div>
@@ -128,71 +110,15 @@
       <button id="reset">Start Over</button>
     </div>
     <button id="redesign-tpl-btn" class="panel-accent">🎨 Redesign Master Template in Drive</button>
-    <button id="panel-users" class="panel-plain" hidden>Manage users</button>
   </div>
 
   <div id="toast" role="alert"></div>
-  <div id="demoBanner" hidden>Preview mode — sample data only. Connect your Apps Script URL to go live.</div>
-  <button id="scrollHint" type="button" hidden>More below <span aria-hidden="true">↓</span></button>
+  <div id="demoBanner" hidden>Preview mode — sample data only.</div>
 
   <div id="wrap">
     <div id="canvas">
       <svg id="svg" aria-hidden="true"></svg>
     </div>
-  </div>
-</div>
-
-<!-- ============ CHANGE PASSWORD ============ -->
-<div id="passwordModal" class="modal" hidden>
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pwTitle">
-    <h3 id="pwTitle">Change password</h3>
-    <form id="passwordForm">
-      <label class="field">Current password
-        <input id="pwOld" type="password" autocomplete="current-password" required>
-      </label>
-      <label class="field">New password
-        <input id="pwNew" type="password" autocomplete="new-password" minlength="8" required>
-      </label>
-      <label class="field">Confirm new password
-        <input id="pwNew2" type="password" autocomplete="new-password" minlength="8" required>
-      </label>
-      <p id="pwMsg" class="auth-msg" role="status" aria-live="polite"></p>
-      <div class="modal-actions">
-        <button type="button" class="btn-ghost" data-close>Cancel</button>
-        <button type="submit" class="btn-primary">Update password</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ============ MANAGE USERS ============ -->
-<div id="usersModal" class="modal" hidden>
-  <div class="modal-card wide" role="dialog" aria-modal="true" aria-labelledby="usersTitle">
-    <h3 id="usersTitle">Users</h3>
-    <div id="usersList" class="users-list"><p class="fineprint">Loading…</p></div>
-
-    <form id="userForm" class="user-form">
-      <h4>Add user</h4>
-      <div class="grid2">
-        <label class="field">Email
-          <input id="nuEmail" type="email" autocomplete="off" required>
-        </label>
-        <label class="field">Full name
-          <input id="nuName" type="text" autocomplete="off" required>
-        </label>
-        <label class="field">Temporary password
-          <input id="nuPass" type="password" autocomplete="new-password" minlength="8" required>
-        </label>
-        <label class="field">Role
-          <select id="nuRole"><option value="teacher">Teacher</option><option value="admin">Administrator</option></select>
-        </label>
-      </div>
-      <p id="nuMsg" class="auth-msg" role="status" aria-live="polite"></p>
-      <div class="modal-actions">
-        <button type="button" class="btn-ghost" data-close>Close</button>
-        <button type="submit" class="btn-primary">Add user</button>
-      </div>
-    </form>
   </div>
 </div>
 

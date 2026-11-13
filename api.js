@@ -11,7 +11,6 @@
   'use strict';
 
   var SESSION_KEY = 'planner_session';   // remembered (localStorage)
-  var URL_KEY = 'planner_api_url';       // remembered backend override
   var DEFAULT_TIMEOUT = 60000;
 
   function cfg() {
@@ -19,18 +18,7 @@
   }
 
   function apiUrl() {
-    var saved = '';
-    try { saved = localStorage.getItem(URL_KEY) || ''; } catch (e) {}
-    return (saved || cfg().apiUrl || '').trim();
-  }
-
-  function setApiUrl(url) {
-    url = String(url || '').trim();
-    try {
-      if (url) localStorage.setItem(URL_KEY, url);
-      else localStorage.removeItem(URL_KEY);
-    } catch (e) {}
-    return url;
+    return String(cfg().apiUrl || '').trim();
   }
 
   function hasBackend() {
@@ -181,7 +169,6 @@
   window.PlannerAPI = {
     hasBackend: hasBackend,
     apiUrl: apiUrl,
-    setApiUrl: setApiUrl,
     call: call,
     token: token,
     readSession: readSession,

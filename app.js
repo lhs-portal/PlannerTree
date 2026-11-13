@@ -88,7 +88,6 @@ let times = { starter: 5, main: 25, closure: 5 };
 // Session / mode state
 let DEMO = false;          // offline sample data
 let CURRENT_USER = null;   // { email, name, role }
-let NEEDS_SETUP = false;   // no users exist yet in the backend
 let installPrompt = null;  // PWA install event
 let STACKED = false;       // single-column layout on narrow screens
 
@@ -277,7 +276,6 @@ function layout() {
   $('#svg').setAttribute('height', h);
 
   animate();
-  requestAnimationFrame(updateScrollHint);
 }
 
 function focusOn(n) {
@@ -287,7 +285,6 @@ function focusOn(n) {
     : Math.max(0, n.x - Math.max(0, (wrap.clientWidth - n.el.offsetWidth) / 2));
   const targetTop = Math.max(0, n.y - 96);
   wrap.scrollTo({ left: targetLeft, top: targetTop, behavior: 'smooth' });
-  setTimeout(updateScrollHint, 420);
 }
 
 function hud() {
@@ -1072,7 +1069,6 @@ $('#scheme').onchange = () => {
 };
 window.addEventListener('resize', () => {
   if (G.length) layout();
-  updateScrollHint();
 });
 
 /* ============================================================
@@ -1107,21 +1103,6 @@ function setAuthBusy(busy, label) {
   }
 }
 
-function setSetupMode(on) {
-  NEEDS_SETUP = !!on;
-  $('#authNameWrap').hidden = !on;
-  $('#authCodeWrap').hidden = !on;
-  $('#authToggle').textContent = 'Connection';
-  $('#authSubmit').textContent = on ? 'Create administrator account' : 'Sign in';
-  if (on) {
-    $('#authPass').setAttribute('autocomplete', 'new-password');
-    setAuthMsg('No accounts yet. Create the first administrator using the setup code in the Apps Script file.');
-  } else {
-    $('#authPass').setAttribute('autocomplete', 'current-password');
-    setAuthMsg('');
-  }
-}
-
 function showAuth() {
   $('#auth').hidden = false;
   $('#app').hidden = true;
@@ -1130,7 +1111,6 @@ function showAuth() {
 function showApp() {
   $('#auth').hidden = true;
   $('#app').hidden = false;
-  updateScrollHint();
 }
 
 function enterApp(user) {
@@ -1140,9 +1120,6 @@ function enterApp(user) {
   $('#umName').textContent = CURRENT_USER.name || 'Signed in';
   $('#umEmail').textContent = CURRENT_USER.email || '';
   $('#avatar').textContent = initials(CURRENT_USER);
-  const isAdmin = String(CURRENT_USER.role || '').toLowerCase() === 'admin';
-  $('#umUsers').hidden = !isAdmin;
-  $('#panel-users').hidden = !isAdmin;
   $('#umInstall').hidden = false;
   $('#authInstall').hidden = false;
   $('#demoBanner').hidden = true;
@@ -1158,8 +1135,6 @@ function enterDemo() {
   $('#umName').textContent = 'Preview mode';
   $('#umEmail').textContent = 'Sample data — not signed in';
   $('#avatar').textContent = 'PV';
-  $('#umUsers').hidden = true;
-  $('#panel-users').hidden = true;
   $('#umInstall').hidden = false;
   $('#authInstall').hidden = false;
   $('#authMode').textContent = 'Demo mode';
@@ -1181,22 +1156,24 @@ function signOut() {
 
 function pingBackend() {
   const url = PlannerAPI.apiUrl();
-  $('#authApiUrl').value = url;
   $('#authMode').textContent = url ? 'Connecting…' : 'Not connected';
 
   if (!url) {
-    $('#authConn').hidden = false;
-    setAuthMsg('Paste your Apps Script Web App URL below to connect this planner.', 'err');
+    setAuthMsg('No backend URL is set in config.js.', 'err');
+    return Promise.resolve(false);
+  }
+
+  if (/\/macros\/library\//.test(url)) {
+    $('#authMode').textContent = 'Connection failed';
+    setAuthMsg('The URL in config.js is an Apps Script library link, not a Web App. In Apps Script choose Deploy → Manage deployments → Web app and use the URL that ends in /exec.', 'err');
     return Promise.resolve(false);
   }
 
   return PlannerAPI.call('authStatus', {}, { timeout: 20000 })
     .then(status => {
       $('#authMode').textContent = 'Connected';
-      $('#authConn').hidden = true;
-      setSetupMode(!!(status && status.needsSetup));
-      if (status && status.needsSetup) {
-        setAuthMsg('First run detected. Create the administrator account with your setup code.');
+      if (status && status.accounts === 0) {
+        setAuthMsg('Connected, but there are no accounts yet. Add a row to the Database_Logins tab in the database spreadsheet.', 'err');
       } else {
         setAuthMsg('');
       }
@@ -1204,7 +1181,6 @@ function pingBackend() {
     })
     .catch(err => {
       $('#authMode').textContent = 'Connection failed';
-      $('#authConn').hidden = false;
       setAuthMsg('Could not reach the backend. ' + err.message, 'err');
       return false;
     });
@@ -1214,27 +1190,23 @@ function submitAuth(e) {
   e.preventDefault();
   if (DEMO) { enterDemo(); return; }
 
+  const url = PlannerAPI.apiUrl();
+  if (!url || /\/macros\/library\//.test(url)) {
+    setAuthMsg('The backend URL in config.js must be the Web App URL that ends in /exec.', 'err');
+    return;
+  }
+
   const email = $('#authEmail').value.trim();
   const password = $('#authPass').value;
-  const name = $('#authName').value.trim();
-  const setupCode = $('#authCode').value.trim();
   const remember = $('#authRemember').checked;
 
   if (!email || !email.includes('@')) { setAuthMsg('Enter a valid email address.', 'err'); return; }
   if (!password) { setAuthMsg('Enter your password.', 'err'); return; }
-  if (password.length < 8) { setAuthMsg('Password must be at least 8 characters.', 'err'); return; }
-  if (NEEDS_SETUP && !name) { setAuthMsg('Enter your full name.', 'err'); return; }
-  if (NEEDS_SETUP && !setupCode) { setAuthMsg('Enter the setup code from the Apps Script file.', 'err'); return; }
 
   setAuthMsg('');
-  setAuthBusy(true, NEEDS_SETUP ? 'Creating account…' : 'Signing in…');
+  setAuthBusy(true, 'Signing in…');
 
-  const action = NEEDS_SETUP ? 'setup' : 'login';
-  const payload = NEEDS_SETUP
-    ? { email: email, password: password, name: name, setupCode: setupCode }
-    : { email: email, password: password };
-
-  PlannerAPI.call(action, payload, { timeout: 30000 })
+  PlannerAPI.call('login', { email: email, password: password }, { timeout: 30000 })
     .then(result => {
       PlannerAPI.saveSession(result.token, result.user, remember);
       setAuthBusy(false);
@@ -1246,158 +1218,8 @@ function submitAuth(e) {
     });
 }
 
-function changePassword(e) {
-  e.preventDefault();
-  const oldPass = $('#pwOld').value;
-  const newPass = $('#pwNew').value;
-  const again = $('#pwNew2').value;
-  const msg = $('#pwMsg');
-
-  msg.className = 'auth-msg';
-  msg.textContent = '';
-
-  if (newPass.length < 8) { msg.className = 'auth-msg err'; msg.textContent = 'New password must be at least 8 characters.'; return; }
-  if (newPass !== again) { msg.className = 'auth-msg err'; msg.textContent = 'The new passwords do not match.'; return; }
-
-  if (DEMO) {
-    msg.className = 'auth-msg ok';
-    msg.textContent = 'Preview mode — password changes are disabled.';
-    return;
-  }
-
-  const btn = $('#passwordForm button[type="submit"]');
-  btn.disabled = true;
-  PlannerAPI.call('changePassword', { oldPassword: oldPass, newPassword: newPass }, { timeout: 30000 })
-    .then(() => {
-      msg.className = 'auth-msg ok';
-      msg.textContent = 'Password updated.';
-      $('#passwordForm').reset();
-      setTimeout(closeModals, 900);
-    })
-    .catch(err => {
-      msg.className = 'auth-msg err';
-      msg.textContent = err.message;
-    })
-    .then(() => { btn.disabled = false; });
-}
-
-function loadUsers() {
-  const list = $('#usersList');
-  list.innerHTML = '<p class="fineprint">Loading…</p>';
-  PlannerAPI.call('listUsers', {}, { timeout: 30000 })
-    .then(r => {
-      const users = (r && r.users) || [];
-      if (!users.length) { list.innerHTML = '<p class="fineprint">No users found.</p>'; return; }
-      list.innerHTML = users.map(u => {
-        const active = u.active !== false;
-        const role = String(u.role || 'teacher').toLowerCase();
-        return `
-          <div class="user-row ${active ? '' : 'off'}">
-            <div class="who">
-              <b>${esc(u.name || u.email)}</b>
-              <small>${esc(u.email)}${u.lastLogin ? ' · last login ' + esc(u.lastLogin) : ''}</small>
-            </div>
-            <span class="role">${esc(role)}</span>
-            <button type="button" class="row-btn" data-toggle="${esc(u.email)}" data-active="${active}">
-              ${active ? 'Disable' : 'Enable'}
-            </button>
-            <button type="button" class="row-btn" data-reset="${esc(u.email)}">Reset</button>
-          </div>`;
-      }).join('');
-
-      list.querySelectorAll('[data-toggle]').forEach(btn => {
-        btn.onclick = () => {
-          btn.disabled = true;
-          PlannerAPI.call('updateUser', {
-            email: btn.dataset.toggle,
-            active: btn.dataset.active !== 'true'
-          }, { timeout: 30000 }).then(loadUsers, err => { btn.disabled = false; toast(err.message); });
-        };
-      });
-
-      list.querySelectorAll('[data-reset]').forEach(btn => {
-        btn.onclick = () => {
-          const temp = window.prompt('New temporary password for ' + btn.dataset.reset + ' (min 8 characters):');
-          if (!temp) return;
-          if (temp.length < 8) { toast('Password must be at least 8 characters.'); return; }
-          PlannerAPI.call('updateUser', { email: btn.dataset.reset, password: temp })
-            .then(() => toast('Temporary password updated. Share it with the user.'), err => toast(err.message));
-        };
-      });
-    })
-    .catch(err => { list.innerHTML = `<p class="fineprint" style="color:var(--bad)">${esc(err.message)}</p>`; });
-}
-
-function addUser(e) {
-  e.preventDefault();
-  const msg = $('#nuMsg');
-  msg.className = 'auth-msg';
-  msg.textContent = '';
-
-  const email = $('#nuEmail').value.trim();
-  const name = $('#nuName').value.trim();
-  const password = $('#nuPass').value;
-  const role = $('#nuRole').value;
-
-  if (password.length < 8) { msg.className = 'auth-msg err'; msg.textContent = 'Password must be at least 8 characters.'; return; }
-
-  const btn = $('#userForm button[type="submit"]');
-  btn.disabled = true;
-  PlannerAPI.call('createUser', { email: email, name: name, password: password, role: role }, { timeout: 30000 })
-    .then(() => {
-      msg.className = 'auth-msg ok';
-      msg.textContent = 'User added.';
-      $('#nuEmail').value = '';
-      $('#nuName').value = '';
-      $('#nuPass').value = '';
-      loadUsers();
-    })
-    .catch(err => {
-      msg.className = 'auth-msg err';
-      msg.textContent = err.message;
-    })
-    .then(() => { btn.disabled = false; });
-}
-
-function openModal(id) {
-  closeMenus();
-  document.querySelectorAll('.modal').forEach(m => { m.hidden = true; });
-  const m = document.getElementById(id);
-  if (m) m.hidden = false;
-  const focusable = m && m.querySelector('input, select, button');
-  if (focusable) setTimeout(() => focusable.focus(), 50);
-}
-
-function closeModals() {
-  document.querySelectorAll('.modal').forEach(m => { m.hidden = true; });
-}
-
-function closeMenus() {
-  $('#userMenu').hidden = true;
-  $('#userBtn').setAttribute('aria-expanded', 'false');
-  $('#panel').classList.remove('open');
-  $('#gear').setAttribute('aria-expanded', 'false');
-}
-
 function wireAuth() {
   $('#authForm').addEventListener('submit', submitAuth);
-  $('#authToggle').addEventListener('click', () => {
-    $('#authConn').hidden = !$('#authConn').hidden;
-    if (!$('#authConn').hidden) $('#authApiUrl').focus();
-  });
-  $('#authConnect').addEventListener('click', () => {
-    const url = $('#authApiUrl').value.trim();
-    if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/.test(url)) {
-      setAuthMsg('That does not look like an Apps Script Web App URL (…/macros/s/…/exec).', 'err');
-      return;
-    }
-    PlannerAPI.setApiUrl(url);
-    $('#authConnect').disabled = true;
-    pingBackend().then(() => {
-      $('#authConnect').disabled = false;
-      if (PlannerAPI.hasBackend()) setAuthMsg('Connection saved.', 'ok');
-    });
-  });
   $('#authDemo').addEventListener('click', enterDemo);
   $('#authInstall').addEventListener('click', installApp);
 }
@@ -1431,24 +1253,7 @@ function wireUserMenu() {
   });
 
   $('#umSignout').addEventListener('click', signOut);
-  $('#umPassword').addEventListener('click', () => openModal('passwordModal'));
-  $('#umUsers').addEventListener('click', () => { openModal('usersModal'); loadUsers(); });
-  $('#panel-users').addEventListener('click', () => { openModal('usersModal'); loadUsers(); });
   $('#umInstall').addEventListener('click', installApp);
-
-  $('#passwordForm').addEventListener('submit', changePassword);
-  $('#userForm').addEventListener('submit', addUser);
-
-  document.querySelectorAll('.modal').forEach(m => {
-    m.addEventListener('click', e => {
-      if (e.target === m) closeModals();
-    });
-    m.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeModals));
-  });
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeModals();
-  });
 }
 
 function wireScrolling() {
@@ -1481,19 +1286,6 @@ function wireScrolling() {
   wrap.addEventListener('pointerup', end);
   wrap.addEventListener('pointerleave', end);
   wrap.addEventListener('pointercancel', end);
-
-  wrap.addEventListener('scroll', updateScrollHint, { passive: true });
-  $('#scrollHint').addEventListener('click', () => {
-    wrap.scrollBy({ top: Math.round(wrap.clientHeight * 0.8), behavior: 'smooth' });
-  });
-}
-
-function updateScrollHint() {
-  const wrap = $('#wrap');
-  const hint = $('#scrollHint');
-  if (!wrap || !hint || $('#app').hidden) return;
-  const remaining = wrap.scrollHeight - wrap.clientHeight - wrap.scrollTop;
-  hint.hidden = remaining < 70;
 }
 
 function installApp() {
@@ -1534,7 +1326,6 @@ function registerServiceWorker() {
 
 function boot() {
   showAuth();
-  setSetupMode(false);
   wireAuth();
   wireUserMenu();
   wireScrolling();
@@ -1543,7 +1334,6 @@ function boot() {
 
   const session = PlannerAPI.readSession();
   const url = PlannerAPI.apiUrl();
-  $('#authApiUrl').value = url;
 
   if (!url) {
     pingBackend();

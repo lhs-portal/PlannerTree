@@ -1,5 +1,5 @@
 /* ============================================================
-   APP SHELL — auth, account menu, panning, modals
+   APP SHELL — auth, account menu, panning
    ============================================================ */
 [hidden] { display: none !important; }
 
@@ -25,27 +25,6 @@
 #wrap::-webkit-scrollbar-thumb:hover { background: rgba(94, 242, 255, 0.5); }
 .card { cursor: pointer; }
 .dn { cursor: default; }
-
-#scrollHint {
-  position: fixed;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  z-index: 9;
-  padding: 7px 14px;
-  border-radius: 20px;
-  border: 1px solid rgba(94, 242, 255, 0.35);
-  background: rgba(10, 16, 28, 0.88);
-  backdrop-filter: blur(10px);
-  color: var(--cy);
-  font: 600 11.5px 'Sora', system-ui, sans-serif;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-}
-#scrollHint:hover { border-color: var(--cy); background: rgba(94, 242, 255, 0.12); }
-/* Keep the "more below" pill clear of the demo banner. */
-#demoBanner:not([hidden]) ~ #scrollHint { bottom: 70px; }
 
 #demoBanner {
   position: fixed;
@@ -162,19 +141,6 @@
   font-family: inherit;
 }
 .panel-accent:hover { background: rgba(94, 242, 255, 0.18); }
-.panel-plain {
-  width: 100%;
-  margin-top: 2px;
-  padding: 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(140, 170, 210, 0.28);
-  background: transparent;
-  color: var(--mut);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-.panel-plain:hover { color: var(--fg); border-color: var(--cy); }
 
 /* ============================================================
    SIGN IN SCREEN
@@ -313,17 +279,6 @@
   transition: border-color 0.2s, background 0.2s;
 }
 .btn-ghost:hover { border-color: var(--cy); background: rgba(94, 242, 255, 0.1); }
-.linkbtn {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--cy);
-  font: inherit;
-  font-size: 11.5px;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
 .auth-msg {
   min-height: 16px;
   margin: 10px 0 0;
@@ -334,12 +289,6 @@
 .auth-msg.err { color: var(--bad); }
 .auth-msg.ok { color: var(--green); }
 
-.auth-conn {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(140, 170, 210, 0.16);
-}
-.auth-conn .btn-ghost { width: 100%; }
 .auth-actions {
   display: flex;
   gap: 8px;
@@ -361,91 +310,6 @@
 }
 .fineprint b { color: var(--fg); font-weight: 500; }
 
-/* ---- Modals ---- */
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: grid;
-  place-items: center;
-  padding: 20px 16px;
-  background: rgba(2, 6, 12, 0.72);
-  backdrop-filter: blur(6px);
-  overflow: auto;
-}
-.modal-card {
-  width: min(420px, 100%);
-  padding: 24px;
-  border-radius: 18px;
-  background: var(--panel-bg);
-  border: 1px solid rgba(94, 242, 255, 0.3);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
-}
-.modal-card.wide { width: min(620px, 100%); }
-.modal-card h3 { margin: 0 0 18px; font-size: 16px; font-weight: 600; color: var(--cy); }
-.modal-card h4 { margin: 4px 0 12px; font-size: 12.5px; font-weight: 600; color: var(--fg); }
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 18px;
-}
-.modal-actions .btn-primary { width: auto; min-width: 130px; }
-.modal-actions .btn-ghost { min-width: 84px; }
-
-.users-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 240px;
-  overflow: auto;
-  margin-bottom: 20px;
-  padding-right: 4px;
-}
-.user-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 11px;
-  border-radius: 10px;
-  border: 1px solid rgba(140, 170, 210, 0.15);
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 12px;
-}
-.user-row .who { flex: 1; min-width: 0; }
-.user-row .who b { display: block; font-weight: 500; color: var(--fg); overflow: hidden; text-overflow: ellipsis; }
-.user-row .who small { color: var(--mut); font-size: 11px; overflow: hidden; text-overflow: ellipsis; display: block; }
-.user-row .role {
-  padding: 2px 7px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--cy);
-  background: rgba(94, 242, 255, 0.1);
-  border: 1px solid rgba(94, 242, 255, 0.22);
-}
-.user-row.off { opacity: 0.5; }
-.user-row .row-btn {
-  padding: 5px 9px;
-  border-radius: 7px;
-  border: 1px solid rgba(140, 170, 210, 0.25);
-  background: transparent;
-  color: var(--mut);
-  font: inherit;
-  font-size: 10.5px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.user-row .row-btn:hover { color: var(--fg); border-color: var(--cy); }
-.user-form {
-  padding-top: 16px;
-  border-top: 1px solid rgba(140, 170, 210, 0.16);
-}
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
-.grid2 .field { margin-bottom: 10px; }
-
 /* ---- Small screens ---- */
 @media (max-width: 720px) {
   #hud {
@@ -463,10 +327,7 @@
   #gear { right: 12px; top: 12px; width: 38px; height: 38px; }
   #panel { right: 12px; top: 58px; width: min(300px, calc(100vw - 24px)); }
   #demoBanner { left: 12px; right: 12px; bottom: 12px; max-width: none; }
-  #scrollHint { bottom: 12px; }
   .auth-card { padding: 22px 20px 18px; }
-  .grid2 { grid-template-columns: 1fr; }
-  .modal-card { padding: 20px 18px; }
   .dn, .dn.wide { width: min(320px, calc(100vw - 32px)); }
   .card { width: min(280px, calc(100vw - 60px)); }
   .final { width: min(290px, calc(100vw - 32px)); }
