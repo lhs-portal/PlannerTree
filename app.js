@@ -1092,10 +1092,6 @@ function showApp() {
 function enterApp(user) {
   CURRENT_USER = user || {};
   DEMO = false;
-  $('#userName').textContent = CURRENT_USER.name || CURRENT_USER.email || 'Account';
-  $('#umName').textContent = CURRENT_USER.name || 'Signed in';
-  $('#umEmail').textContent = CURRENT_USER.email || '';
-  $('#avatar').textContent = initials(CURRENT_USER);
   $('#umInstall').hidden = false;
   $('#authInstall').hidden = false;
   $('#demoBanner').hidden = true;
@@ -1107,10 +1103,6 @@ function enterApp(user) {
 function enterDemo() {
   DEMO = true;
   CURRENT_USER = { name: 'Preview mode', email: 'sample data', role: 'teacher' };
-  $('#userName').textContent = 'Preview';
-  $('#umName').textContent = 'Preview mode';
-  $('#umEmail').textContent = 'Sample data — not signed in';
-  $('#avatar').textContent = 'PV';
   $('#umInstall').hidden = false;
   $('#authInstall').hidden = false;
   $('#authMode').textContent = 'Demo mode';
@@ -1201,27 +1193,14 @@ function wireAuth() {
 }
 
 function wireUserMenu() {
-  $('#userBtn').addEventListener('click', e => {
-    e.stopPropagation();
-    const open = $('#userMenu').hidden;
-    $('#userMenu').hidden = !open;
-    $('#userBtn').setAttribute('aria-expanded', String(open));
-  });
-
   $('#gear').addEventListener('click', e => {
     e.stopPropagation();
     const open = !$('#panel').classList.contains('open');
     $('#panel').classList.toggle('open', open);
     $('#gear').setAttribute('aria-expanded', String(open));
-    $('#userMenu').hidden = true;
-    $('#userBtn').setAttribute('aria-expanded', 'false');
   });
 
   document.addEventListener('click', e => {
-    if (!e.target.closest('#userbox')) {
-      $('#userMenu').hidden = true;
-      $('#userBtn').setAttribute('aria-expanded', 'false');
-    }
     if (!e.target.closest('#panel') && !e.target.closest('#gear')) {
       $('#panel').classList.remove('open');
       $('#gear').setAttribute('aria-expanded', 'false');

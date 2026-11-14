@@ -65,19 +65,6 @@
     <span id="dots"></span>
   </div>
 
-  <div id="userbox">
-    <button id="userBtn" aria-haspopup="true" aria-expanded="false" aria-controls="userMenu">
-      <span id="avatar">·</span>
-      <span id="userName">Account</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-    </button>
-    <div id="userMenu" hidden>
-      <div class="um-head"><b id="umName">—</b><small id="umEmail"></small></div>
-      <button id="umInstall" type="button" hidden>⤓ Install app</button>
-      <button id="umSignout" type="button" class="danger">Sign out</button>
-    </div>
-  </div>
-
   <button id="gear" aria-label="Planner settings" aria-expanded="false">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
       <path d="M4 7h10M18 7h2M4 17h2M10 17h10"/>
@@ -110,6 +97,10 @@
       <button id="reset">Start Over</button>
     </div>
     <button id="redesign-tpl-btn" class="panel-accent">🎨 Redesign Master Template in Drive</button>
+    <div class="row panel-session">
+      <button id="umInstall" type="button" hidden>⤓ Install app</button>
+      <button id="umSignout" type="button" class="danger">Sign out</button>
+    </div>
   </div>
 
   <div id="toast" role="alert"></div>
