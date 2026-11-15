@@ -1,5 +1,5 @@
 /* Lesson Tree Planner — offline app shell */
-const CACHE = 'planner-shell-v8';
+const CACHE = 'planner-shell-v9';
 const SHELL = [
   './',
   './index.html',

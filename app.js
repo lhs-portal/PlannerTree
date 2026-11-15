@@ -509,7 +509,6 @@ function itemsFor(src) {
       return act === 'starter' || /^starter/i.test(act);
     }).map(s => ({
       label: s.label || s.name,
-      sub: s.sub || s.procedure,
       tag: 'Starter',
       row: s.row
     }));
@@ -521,7 +520,6 @@ function itemsFor(src) {
       return act === 'main' || /^main/i.test(act);
     }).map(s => ({
       label: s.label || s.name,
-      sub: s.sub || s.procedure,
       tag: s.approach ? `Main · ${s.approach}` : 'Main Activity',
       row: s.row
     }));
@@ -533,7 +531,6 @@ function itemsFor(src) {
       return act === 'closure' || /^clos/i.test(act);
     }).map(s => ({
       label: s.label || s.name,
-      sub: s.sub || s.procedure,
       tag: 'Closure',
       row: s.row
     }));
@@ -636,7 +633,6 @@ function openGroup(gi) {
   g.dn = mk('dn', `
     <span class="pill">Step ${d.st}</span>
     <b>${esc(d.title)}</b>
-    <span class="hint">${esc(d.hint || '')}</span>
     ${d.text ? `<textarea placeholder="${esc(d.text)}" aria-label="${esc(d.title)}"></textarea>` : ''}
     <button class="go">${d.multi ? 'Confirm &amp; Trim' : 'Confirm Selection'}</button>
   `);
