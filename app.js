@@ -5,8 +5,9 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 const DW = 260;      // Standard decision node width
 const W = 280;       // Leaf card width
 const COL_W = 330;   // Horizontal spacing between the nodes of one step
-const MAX_COLS = 4;  // Widest step (Starter, Main, Closure, Assessment)
+const OX = 40;       // Left margin of the tree
 const STACK_BELOW = 720; // Only phones use a single column; wider windows scroll sideways
+const ZOOM_MIN = 0.3, ZOOM_MAX = 2; // Tree zoom limits (the buttons and HUD never zoom)
 const ROW_GAP = 70;  // Vertical row gap between stage groups
 const GY = 12;       // Gap between stacked cards
 const PX = 60, PY = 90; // Canvas padding
@@ -22,7 +23,7 @@ const MAT = [
 
 /**
  * The Decision Tree Flow. Each step is one row: its nodes run left to right
- * (col 0, 1, 2 ...) and the next step starts on the row below (group).
+ * (slot 0, 1, 2 ...) and the next step starts on the row below (group).
  *
  *   Step 1: Strand, Sub-strand, Outcome
  *   Step 2: Intention, Indicator, Success Criteria
@@ -33,39 +34,44 @@ const MAT = [
  *   Step 7: Time Allocation
  *   Final:  Plan generation
  *
- * pk = the node this one grows from, et = the connector style
- * ('h' sideways, 'v' straight down, 'wrap' down and across to the next row).
+ * pk  = the node this one branches from. Every node of a step branches from
+ *       the same parent (not from its neighbour), except in step 1 where
+ *       Strand -> Sub-strand -> Outcome is a real hierarchy.
+ * pks = extra parents (Time Allocation is fed by Starter, Main and Closure).
+ * A step starts directly below its parent: its first node sits in the
+ * parent's column and the rest follow to the right.
+ * et  = connector style ('h' sideways, 'wrap' down to the next row).
  */
 const FLOW = [
   // --- Step 1: Curriculum Hierarchy ---
-  { st: 1, key: 'STRAND', title: 'Strand / Unit', src: 'strands', multi: 0, group: 0, col: 0 },
-  { st: 1, key: 'SUBSTRAND', title: 'Sub-strand', src: 'substrands', multi: 0, group: 0, col: 1, pk: 'STRAND', et: 'h' },
-  { st: 1, key: 'OUTCOME', title: 'Curriculum Outcome', src: 'outcomes', multi: 1, group: 0, col: 2, pk: 'SUBSTRAND', et: 'h' },
+  { st: 1, key: 'STRAND', title: 'Strand / Unit', src: 'strands', multi: 0, group: 0, slot: 0 },
+  { st: 1, key: 'SUBSTRAND', title: 'Sub-strand', src: 'substrands', multi: 0, group: 0, slot: 1, pk: 'STRAND', et: 'h' },
+  { st: 1, key: 'OUTCOME', title: 'Curriculum Outcome', src: 'outcomes', multi: 1, group: 0, slot: 2, pk: 'SUBSTRAND', et: 'h' },
 
-  // --- Step 2: Curriculum Targets ---
-  { st: 2, key: 'INTENTION', title: 'Learning Intention', src: 'target_intention', multi: 1, group: 1, col: 0, pk: 'OUTCOME', et: 'wrap' },
-  { st: 2, key: 'INDICATOR', title: 'Indicator of Learning', src: 'target_indicator', multi: 1, group: 1, col: 1, pk: 'INTENTION', et: 'h' },
-  { st: 2, key: 'SUCCESS_CRITERIA', title: 'Success Criteria', src: 'target_criteria', multi: 1, group: 1, col: 2, pk: 'INDICATOR', et: 'h' },
+  // --- Step 2: Curriculum Targets (all branch from the Outcome) ---
+  { st: 2, key: 'INTENTION', title: 'Learning Intention', src: 'target_intention', multi: 1, group: 1, slot: 0, pk: 'OUTCOME', et: 'wrap' },
+  { st: 2, key: 'INDICATOR', title: 'Indicator of Learning', src: 'target_indicator', multi: 1, group: 1, slot: 1, pk: 'OUTCOME', et: 'wrap' },
+  { st: 2, key: 'SUCCESS_CRITERIA', title: 'Success Criteria', src: 'target_criteria', multi: 1, group: 1, slot: 2, pk: 'OUTCOME', et: 'wrap' },
 
-  // --- Step 3: Competencies, Values and Prior Learning ---
-  { st: 3, key: 'COMPETENCIES', title: 'Key Competencies', src: 'competencies', multi: 1, group: 2, col: 0, pk: 'SUCCESS_CRITERIA', et: 'wrap' },
-  { st: 3, key: 'VALUES', title: 'Shared Values', src: 'values', multi: 1, group: 2, col: 1, pk: 'COMPETENCIES', et: 'h' },
-  { st: 3, key: 'PRIOR_LEARNING', title: 'Prior Learning', text: 'What foundational knowledge do students already bring?', group: 2, col: 2, pk: 'VALUES', et: 'h' },
+  // --- Step 3: Competencies, Values and Prior Learning (all branch from Success Criteria) ---
+  { st: 3, key: 'COMPETENCIES', title: 'Key Competencies', src: 'competencies', multi: 1, group: 2, slot: 0, pk: 'SUCCESS_CRITERIA', et: 'wrap' },
+  { st: 3, key: 'VALUES', title: 'Shared Values', src: 'values', multi: 1, group: 2, slot: 1, pk: 'SUCCESS_CRITERIA', et: 'wrap' },
+  { st: 3, key: 'PRIOR_LEARNING', title: 'Prior Learning', text: 'What foundational knowledge do students already bring?', group: 2, slot: 2, pk: 'SUCCESS_CRITERIA', et: 'wrap' },
 
   // --- Step 4: Materials ---
-  { st: 4, key: 'MATERIALS', title: 'Materials Needed', opts: MAT, multi: 1, group: 3, col: 0, pk: 'PRIOR_LEARNING', et: 'wrap' },
+  { st: 4, key: 'MATERIALS', title: 'Materials Needed', opts: MAT, multi: 1, group: 3, slot: 0, pk: 'PRIOR_LEARNING', et: 'wrap' },
 
   // --- Step 5: Pedagogy ---
-  { st: 5, key: 'PEDAGOGY', title: 'Pedagogy Approach', opts: ['Teacher-centred', 'Student-centred', 'Blended (Teacher & Student)'], multi: 1, group: 4, col: 0, pk: 'MATERIALS', et: 'v' },
+  { st: 5, key: 'PEDAGOGY', title: 'Pedagogy Approach', opts: ['Teacher-centred', 'Student-centred', 'Blended (Teacher & Student)'], multi: 1, group: 4, slot: 0, pk: 'MATERIALS', et: 'wrap' },
 
-  // --- Step 6: Teaching Strategies and Assessment ---
-  { st: 6, key: 'STARTER', title: 'Starter Strategy', src: 'strategies_starter', multi: 1, group: 5, col: 0, pk: 'PEDAGOGY', et: 'v' },
-  { st: 6, key: 'MAIN', title: 'Main Activity Strategy', src: 'strategies_main', multi: 1, group: 5, col: 1, pk: 'STARTER', et: 'h' },
-  { st: 6, key: 'CLOSURE', title: 'Closure Strategy', src: 'strategies_closure', multi: 1, group: 5, col: 2, pk: 'MAIN', et: 'h' },
-  { st: 6, key: 'ASSESSMENT', title: 'Assessment Tools', src: 'assessments', multi: 1, group: 5, col: 3, pk: 'CLOSURE', et: 'h' },
+  // --- Step 6: Teaching Strategies and Assessment (all branch from Pedagogy) ---
+  { st: 6, key: 'STARTER', title: 'Starter Strategy', src: 'strategies_starter', multi: 1, group: 5, slot: 0, pk: 'PEDAGOGY', et: 'wrap' },
+  { st: 6, key: 'MAIN', title: 'Main Activity Strategy', src: 'strategies_main', multi: 1, group: 5, slot: 1, pk: 'PEDAGOGY', et: 'wrap' },
+  { st: 6, key: 'CLOSURE', title: 'Closure Strategy', src: 'strategies_closure', multi: 1, group: 5, slot: 2, pk: 'PEDAGOGY', et: 'wrap' },
+  { st: 6, key: 'ASSESSMENT', title: 'Assessment Tools', src: 'assessments', multi: 1, group: 5, slot: 3, pk: 'PEDAGOGY', et: 'wrap' },
 
-  // --- Step 7: Time Allocation (35 min period) ---
-  { st: 7, key: 'TIME_ALLOCATION', title: 'Time Allocation (35 min)', group: 6, col: 0, pk: 'ASSESSMENT', et: 'wrap', isTimeBar: true }
+  // --- Step 7: Time Allocation (shares the 35 minutes between the three activities) ---
+  { st: 7, key: 'TIME_ALLOCATION', title: 'Time Allocation (35 min)', group: 6, slot: 0, pk: 'MAIN', pks: ['STARTER', 'MAIN', 'CLOSURE'], et: 'wrap', isTimeBar: true }
 ];
 
 let db = {};
@@ -82,6 +88,11 @@ let DEMO = false;          // offline sample data
 let CURRENT_USER = null;   // { email, name, role }
 let installPrompt = null;  // PWA install event
 let STACKED = false;       // single-column layout on narrow screens
+let ZOOM = 1;              // tree zoom (1 = normal)
+try {
+  const z = parseFloat(localStorage.getItem('lt_zoom'));
+  if (z >= ZOOM_MIN && z <= ZOOM_MAX) ZOOM = z;
+} catch (e) {}
 
 // Load settings from localStorage or defaults
 try {
@@ -199,7 +210,7 @@ function layout() {
 
   const availableWidth = $('#wrap').clientWidth || 1200;
   STACKED = availableWidth < STACK_BELOW;
-  const ox = STACKED ? 16 : Math.max(40, (availableWidth - (MAX_COLS * COL_W)) / 2);
+  const ox = STACKED ? 16 : OX;
 
   let mx = 0, my = 0;
   const set = (n, x, y) => {
@@ -223,7 +234,7 @@ function layout() {
   if (STACKED) {
     // Single column: every decision and its cards flow top-to-bottom.
     sortedGroupKeys.forEach(grpIdx => {
-      const groupNodes = groups[grpIdx].slice().sort((a, b) => (a.d.col || 0) - (b.d.col || 0));
+      const groupNodes = groups[grpIdx].slice().sort((a, b) => (a.d.slot || 0) - (b.d.slot || 0));
       groupNodes.forEach(g => {
         set(g.dn, ox, curY);
         curY += H(g.dn) + GY;
@@ -240,12 +251,16 @@ function layout() {
     }
   } else {
     sortedGroupKeys.forEach(grpIdx => {
-      const groupNodes = groups[grpIdx];
+      const groupNodes = groups[grpIdx].slice().sort((a, b) => (a.d.slot || 0) - (b.d.slot || 0));
+
+      // A step starts directly below the node it branches from.
+      const lead = groupNodes[0].d.pk ? by(groupNodes[0].d.pk) : null;
+      const baseCol = lead && lead.col != null ? lead.col : 0;
       let maxGroupH = 0;
 
       groupNodes.forEach(g => {
-        const col = g.d.col != null ? g.d.col : 0;
-        const x = ox + col * COL_W;
+        g.col = baseCol + (g.d.slot || 0);
+        const x = ox + g.col * COL_W;
 
         set(g.dn, x, curY);
 
@@ -263,7 +278,9 @@ function layout() {
     });
 
     if (final) {
-      set(final, ox, curY);
+      // The final node sits directly below the last step.
+      const lastG = G[G.length - 1];
+      set(final, ox + (lastG && lastG.col != null ? lastG.col : 0) * COL_W, curY);
       curY += H(final) + ROW_GAP;
     }
   }
@@ -278,15 +295,99 @@ function layout() {
   $('#svg').setAttribute('width', w);
   $('#svg').setAttribute('height', h);
 
+  applyZoom();
   animate();
+}
+
+/* ---------------------------------------------------------------------------
+ * Tree zoom. Only the tree (#canvas) is scaled. The HUD, buttons, settings
+ * panel and notices sit outside #wrap and stay at their normal size.
+ * ------------------------------------------------------------------------- */
+
+function applyZoom() {
+  const cv = $('#canvas');
+  cv.style.transformOrigin = '0 0';
+  cv.style.transform = ZOOM === 1 ? '' : `scale(${ZOOM})`;
+
+  // The layout box keeps its unscaled size, so give back the space a smaller
+  // tree does not use (a larger tree extends the scroll area by itself).
+  const w = parseFloat(cv.style.width) || 0;
+  const h = parseFloat(cv.style.height) || 0;
+  cv.style.marginRight = ZOOM < 1 ? `${-(w * (1 - ZOOM))}px` : '';
+  cv.style.marginBottom = ZOOM < 1 ? `${-(h * (1 - ZOOM))}px` : '';
+}
+
+/** Sets the zoom, keeping the point (cx, cy) of the viewport where it is. */
+function setZoom(next, cx, cy) {
+  next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+  if (Math.abs(next - ZOOM) < 0.001) return;
+
+  const wrap = $('#wrap');
+  if (cx == null) cx = wrap.clientWidth / 2;
+  if (cy == null) cy = wrap.clientHeight / 2;
+
+  const px = wrap.scrollLeft + cx;
+  const py = wrap.scrollTop + cy;
+  const ratio = next / ZOOM;
+
+  ZOOM = next;
+  applyZoom();
+  wrap.scrollLeft = px * ratio - cx;
+  wrap.scrollTop = py * ratio - cy;
+
+  try { localStorage.setItem('lt_zoom', String(Math.round(ZOOM * 1000) / 1000)); } catch (e) {}
+}
+
+function wireZoom() {
+  const wrap = $('#wrap');
+  const at = e => {
+    const r = wrap.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  };
+
+  // Ctrl + mouse wheel, and trackpad pinch (browsers send it as Ctrl + wheel)
+  wrap.addEventListener('wheel', e => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    const k = e.deltaMode === 1 ? 0.05 : 0.0015;
+    const [x, y] = at(e);
+    setZoom(ZOOM * Math.exp(-e.deltaY * k), x, y);
+  }, { passive: false });
+
+  // Ctrl + / Ctrl - / Ctrl 0 zoom the tree instead of the whole page
+  document.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    if (e.key === '=' || e.key === '+') { e.preventDefault(); setZoom(ZOOM * 1.15); }
+    else if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom(ZOOM / 1.15); }
+    else if (e.key === '0') { e.preventDefault(); setZoom(1); }
+  });
+
+  // Two-finger pinch on touch screens
+  let pinch = null;
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  wrap.style.touchAction = 'pan-x pan-y';
+  wrap.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) pinch = { d: dist(e.touches), z: ZOOM };
+  }, { passive: true });
+  wrap.addEventListener('touchmove', e => {
+    if (!pinch || e.touches.length !== 2) return;
+    e.preventDefault();
+    const r = wrap.getBoundingClientRect();
+    const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left;
+    const my = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+    setZoom(pinch.z * dist(e.touches) / pinch.d, mx, my);
+  }, { passive: false });
+  const endPinch = e => { if (e.touches.length < 2) pinch = null; };
+  wrap.addEventListener('touchend', endPinch, { passive: true });
+  wrap.addEventListener('touchcancel', endPinch, { passive: true });
 }
 
 function focusOn(n) {
   const wrap = $('#wrap');
   const targetLeft = STACKED
     ? 0
-    : Math.max(0, n.x - Math.max(0, (wrap.clientWidth - n.el.offsetWidth) / 2));
-  const targetTop = Math.max(0, n.y - 96);
+    : Math.max(0, n.x * ZOOM - Math.max(0, (wrap.clientWidth - n.el.offsetWidth * ZOOM) / 2));
+  const targetTop = Math.max(0, n.y * ZOOM - 96);
   wrap.scrollTo({ left: targetLeft, top: targetTop, behavior: 'smooth' });
 }
 
@@ -620,9 +721,8 @@ function openGroup(gi) {
     };
 
     if (d.pk) {
-      const parentNode = by(d.pk).dn;
-      from(g.dn, parentNode);
-      edge(parentNode, g.dn, 1, d.et || 'v', by(d.pk));
+      from(g.dn, by(d.pk).dn);
+      (d.pks || [d.pk]).forEach(k => edge(by(k).dn, g.dn, 1, d.et || 'v', by(k)));
     }
     
     hud();
@@ -649,9 +749,8 @@ function openGroup(gi) {
   }
 
   if (d.pk) {
-    const parentNode = by(d.pk).dn;
-    from(g.dn, parentNode);
-    edge(parentNode, g.dn, 1, d.et || 'h', by(d.pk));
+    from(g.dn, by(d.pk).dn);
+    (d.pks || [d.pk]).forEach(k => edge(by(k).dn, g.dn, 1, d.et || 'h', by(k)));
   } else {
     g.dn.el.style.left = PX + 'px';
     g.dn.el.style.top = PY + 'px';
@@ -1281,6 +1380,7 @@ function boot() {
   wireAuth();
   wireUserMenu();
   wireScrolling();
+  wireZoom();
   wireInstall();
   registerServiceWorker();
 
