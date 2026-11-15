@@ -487,7 +487,6 @@ function itemsFor(src) {
     return (db.competencies || []).map(x => ({
       label: x.label,
       indicator: x.indicator || x.sub || '',
-      sub: formatIndicatorText(x.indicator || x.sub || ''),
       tag: 'Competency'
     }));
   }
@@ -497,7 +496,6 @@ function itemsFor(src) {
     return (db.values || []).map(x => ({
       label: x.label,
       indicator: x.indicator || x.sub || '',
-      sub: formatIndicatorText(x.indicator || x.sub || ''),
       tag: 'Shared Value'
     }));
   }
