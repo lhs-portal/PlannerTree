@@ -4,7 +4,9 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 // Constants for layout
 const DW = 260;      // Standard decision node width
 const W = 280;       // Leaf card width
-const COL_W = 350;   // Horizontal column spacing
+const COL_W = 330;   // Horizontal spacing between the nodes of one step
+const MAX_COLS = 4;  // Widest step (Starter, Main, Closure, Assessment)
+const STACK_BELOW = 720; // Only phones use a single column; wider windows scroll sideways
 const ROW_GAP = 70;  // Vertical row gap between stage groups
 const GY = 12;       // Gap between stacked cards
 const PX = 60, PY = 90; // Canvas padding
@@ -19,61 +21,51 @@ const MAT = [
 ];
 
 /**
- * The Decision Tree Flow:
- * Phase 1: Curriculum Hierarchy (Strand -> Substrand -> Outcome)
- * Phase 2: Curriculum Targets (Intention -> Indicator -> Success Criteria)
- * Phase 3: National Competencies & Shared Values (with Indicators)
- * Phase 4: Prior Learning, Materials & Pedagogy
- * Phase 5: Instructional Strategies (Starter, Main Activity, Closure)
- * Phase 6: Adjustable 35-Minute Timer Balancer
- * Phase 7: Assessment Tools
+ * The Decision Tree Flow. Each step is one row: its nodes run left to right
+ * (col 0, 1, 2 ...) and the next step starts on the row below (group).
+ *
+ *   Step 1: Strand, Sub-strand, Outcome
+ *   Step 2: Intention, Indicator, Success Criteria
+ *   Step 3: Key Competencies, Shared Values, Prior Learning
+ *   Step 4: Materials
+ *   Step 5: Pedagogy Approach
+ *   Step 6: Starter, Main, Closure, Assessment
+ *   Step 7: Time Allocation
+ *   Final:  Plan generation
+ *
+ * pk = the node this one grows from, et = the connector style
+ * ('h' sideways, 'v' straight down, 'wrap' down and across to the next row).
  */
 const FLOW = [
-  // --- Phase 1: Curriculum Hierarchy ---
-  { st: 1, key: 'STRAND', title: 'Strand / Unit', src: 'strands', multi: 0, group: 0, col: 0,
-    hint: 'Select the curriculum strand (Unit) from your syllabus.' },
-  { st: 1, key: 'SUBSTRAND', title: 'Sub-strand', src: 'substrands', multi: 0, group: 0, col: 1, pk: 'STRAND', et: 'h',
-    hint: 'Select the sub-strand under this unit.' },
-  { st: 1, key: 'OUTCOME', title: 'Curriculum Outcome', src: 'outcomes', multi: 1, group: 0, col: 2, pk: 'SUBSTRAND', et: 'h',
-    hint: 'Choose the learning outcome(s) for the week.' },
+  // --- Step 1: Curriculum Hierarchy ---
+  { st: 1, key: 'STRAND', title: 'Strand / Unit', src: 'strands', multi: 0, group: 0, col: 0 },
+  { st: 1, key: 'SUBSTRAND', title: 'Sub-strand', src: 'substrands', multi: 0, group: 0, col: 1, pk: 'STRAND', et: 'h' },
+  { st: 1, key: 'OUTCOME', title: 'Curriculum Outcome', src: 'outcomes', multi: 1, group: 0, col: 2, pk: 'SUBSTRAND', et: 'h' },
 
-  // --- Phase 2: Curriculum Targets (fetched directly from sheet) ---
-  { st: 2, key: 'INTENTION', title: 'Learning Intention', src: 'target_intention', multi: 1, group: 1, col: 0, pk: 'OUTCOME', et: 'wrap',
-    hint: 'Syllabus learning intention (confirm or customize).' },
-  { st: 2, key: 'INDICATOR', title: 'Indicator of Learning', src: 'target_indicator', multi: 1, group: 1, col: 1, pk: 'INTENTION', et: 'h',
-    hint: 'Observable evidence demonstrating the outcome.' },
-  { st: 2, key: 'SUCCESS_CRITERIA', title: 'Success Criteria', src: 'target_criteria', multi: 1, group: 1, col: 2, pk: 'INDICATOR', et: 'h',
-    hint: 'How students will show they have met the goals.' },
+  // --- Step 2: Curriculum Targets ---
+  { st: 2, key: 'INTENTION', title: 'Learning Intention', src: 'target_intention', multi: 1, group: 1, col: 0, pk: 'OUTCOME', et: 'wrap' },
+  { st: 2, key: 'INDICATOR', title: 'Indicator of Learning', src: 'target_indicator', multi: 1, group: 1, col: 1, pk: 'INTENTION', et: 'h' },
+  { st: 2, key: 'SUCCESS_CRITERIA', title: 'Success Criteria', src: 'target_criteria', multi: 1, group: 1, col: 2, pk: 'INDICATOR', et: 'h' },
 
-  // --- Phase 3: Core Attributes (Appear Below, showing indicators) ---
-  { st: 3, key: 'COMPETENCIES', title: 'Key Competencies', src: 'competencies', multi: 1, group: 2, col: 0, pk: 'SUCCESS_CRITERIA', et: 'wrap',
-    hint: 'Select applicable key competencies with classroom indicators (up to 6).' },
-  { st: 3, key: 'VALUES', title: 'Shared Values', src: 'values', multi: 1, group: 2, col: 1, pk: 'COMPETENCIES', et: 'h',
-    hint: 'Select applicable shared values with classroom indicators (up to 5).' },
+  // --- Step 3: Competencies, Values and Prior Learning ---
+  { st: 3, key: 'COMPETENCIES', title: 'Key Competencies', src: 'competencies', multi: 1, group: 2, col: 0, pk: 'SUCCESS_CRITERIA', et: 'wrap' },
+  { st: 3, key: 'VALUES', title: 'Shared Values', src: 'values', multi: 1, group: 2, col: 1, pk: 'COMPETENCIES', et: 'h' },
+  { st: 3, key: 'PRIOR_LEARNING', title: 'Prior Learning', text: 'What foundational knowledge do students already bring?', group: 2, col: 2, pk: 'VALUES', et: 'h' },
 
-  // --- Phase 4: Learning Environment & Pedagogy ---
-  { st: 4, key: 'PRIOR_LEARNING', title: 'Prior Learning', text: 'What foundational knowledge do students already bring?', group: 3, col: 0, pk: 'VALUES', et: 'wrap',
-    hint: 'Prior concept connection for student recall.' },
-  { st: 4, key: 'MATERIALS', title: 'Materials Needed', opts: MAT, multi: 1, group: 3, col: 1, pk: 'PRIOR_LEARNING', et: 'h',
-    hint: 'Select resources required for the lessons.' },
-  { st: 4, key: 'PEDAGOGY', title: 'Pedagogy Approach', opts: ['Teacher-centred', 'Student-centred', 'Blended (Teacher & Student)'], multi: 1, group: 3, col: 2, pk: 'MATERIALS', et: 'h',
-    hint: 'Instructional orientation used across activities.' },
+  // --- Step 4: Materials ---
+  { st: 4, key: 'MATERIALS', title: 'Materials Needed', opts: MAT, multi: 1, group: 3, col: 0, pk: 'PRIOR_LEARNING', et: 'wrap' },
 
-  // --- Phase 5: Teaching Strategies (Strict Activity Matching) ---
-  { st: 5, key: 'STARTER', title: 'Starter Strategy', src: 'strategies_starter', multi: 1, group: 4, col: 0, pk: 'PEDAGOGY', et: 'wrap',
-    hint: 'Showing ONLY strategies assigned to Starter activity.' },
-  { st: 5, key: 'MAIN', title: 'Main Activity Strategy', src: 'strategies_main', multi: 1, group: 4, col: 1, pk: 'STARTER', et: 'h',
-    hint: 'Showing ONLY strategies assigned to Main activity.' },
-  { st: 5, key: 'CLOSURE', title: 'Closure Strategy', src: 'strategies_closure', multi: 1, group: 4, col: 2, pk: 'MAIN', et: 'h',
-    hint: 'Showing ONLY strategies assigned to Closure activity.' },
+  // --- Step 5: Pedagogy ---
+  { st: 5, key: 'PEDAGOGY', title: 'Pedagogy Approach', opts: ['Teacher-centred', 'Student-centred', 'Blended (Teacher & Student)'], multi: 1, group: 4, col: 0, pk: 'MATERIALS', et: 'v' },
 
-  // --- Phase 6: Time Allocation (35 min Period) ---
-  { st: 6, key: 'TIME_ALLOCATION', title: 'Time Allocation (35 min)', group: 5, col: 1, pk: 'CLOSURE', et: 'v', isTimeBar: true,
-    hint: 'Coupled 35-minute duration. Increasing one activity balances the others.' },
+  // --- Step 6: Teaching Strategies and Assessment ---
+  { st: 6, key: 'STARTER', title: 'Starter Strategy', src: 'strategies_starter', multi: 1, group: 5, col: 0, pk: 'PEDAGOGY', et: 'v' },
+  { st: 6, key: 'MAIN', title: 'Main Activity Strategy', src: 'strategies_main', multi: 1, group: 5, col: 1, pk: 'STARTER', et: 'h' },
+  { st: 6, key: 'CLOSURE', title: 'Closure Strategy', src: 'strategies_closure', multi: 1, group: 5, col: 2, pk: 'MAIN', et: 'h' },
+  { st: 6, key: 'ASSESSMENT', title: 'Assessment Tools', src: 'assessments', multi: 1, group: 5, col: 3, pk: 'CLOSURE', et: 'h' },
 
-  // --- Phase 7: Assessment ---
-  { st: 7, key: 'ASSESSMENT', title: 'Assessment Tools', src: 'assessments', multi: 1, group: 6, col: 1, pk: 'TIME_ALLOCATION', et: 'v',
-    hint: 'Formative or summative tools to evaluate comprehension.' }
+  // --- Step 7: Time Allocation (35 min period) ---
+  { st: 7, key: 'TIME_ALLOCATION', title: 'Time Allocation (35 min)', group: 6, col: 0, pk: 'ASSESSMENT', et: 'wrap', isTimeBar: true }
 ];
 
 let db = {};
@@ -129,13 +121,24 @@ function show(ns) {
   requestAnimationFrame(() => requestAnimationFrame(() => ns.forEach(n => n.el.classList.remove('trim'))));
 }
 
-function edge(a, b, c, t) {
+function edge(a, b, c, t, src) {
   const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   if (c) p.setAttribute('class', 'c');
   $('#svg').appendChild(p);
-  const e = { a, b, p, t };
+  const e = { a, b, p, t, src };
   E.push(e);
   return e;
+}
+
+/**
+ * Where a connector going down to the next step leaves from: below the last
+ * card still hanging from the node, or the node itself if it has none.
+ */
+function downStart(e, A) {
+  const leaves = e.src && e.src.leaves;
+  const last = leaves && leaves.length ? leaves[leaves.length - 1].el : null;
+  if (last) return { x: last.offsetLeft + last.offsetWidth / 2, y: last.offsetTop + last.offsetHeight };
+  return { x: A.offsetLeft + A.offsetWidth / 2, y: A.offsetTop + A.offsetHeight };
 }
 
 /** Draws smooth SVG cubic Bézier curves connecting progressive decisions */
@@ -159,12 +162,14 @@ function draw() {
       const x2 = bl, y2 = bt + bh / 2;
       d = `M${x1} ${y1} C${x1} ${y1 + (y2 - y1) * 0.6}, ${x1 + 10} ${y2}, ${x2} ${y2}`;
     } else if (t === 'v') {
-      const x1 = al + aw / 2, y1 = at + ah;
+      const s = downStart(e, A);
+      const x1 = s.x, y1 = s.y;
       const x2 = bl + bw / 2, y2 = bt;
       const k = (y2 - y1) / 2;
       d = `M${x1} ${y1} C${x1} ${y1 + k}, ${x2} ${y2 - k}, ${x2} ${y2}`;
     } else if (t === 'wrap') {
-      const x1 = al + aw / 2, y1 = at + ah;
+      const s = downStart(e, A);
+      const x1 = s.x, y1 = s.y;
       const x2 = bl + bw / 2, y2 = bt;
       const midY = y1 + (y2 - y1) * 0.5;
       d = `M${x1} ${y1} C${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
@@ -192,10 +197,9 @@ function layout() {
   void cv.offsetWidth;
   const H = n => n.el.offsetHeight;
 
-  const totalCols = 3;
   const availableWidth = $('#wrap').clientWidth || 1200;
-  STACKED = availableWidth < 1080;
-  const ox = STACKED ? 16 : Math.max(40, (availableWidth - (totalCols * COL_W)) / 2);
+  STACKED = availableWidth < STACK_BELOW;
+  const ox = STACKED ? 16 : Math.max(40, (availableWidth - (MAX_COLS * COL_W)) / 2);
 
   let mx = 0, my = 0;
   const set = (n, x, y) => {
@@ -259,8 +263,7 @@ function layout() {
     });
 
     if (final) {
-      const x = ox + 1 * COL_W;
-      set(final, x, curY);
+      set(final, ox, curY);
       curY += H(final) + ROW_GAP;
     }
   }
@@ -619,7 +622,7 @@ function openGroup(gi) {
     if (d.pk) {
       const parentNode = by(d.pk).dn;
       from(g.dn, parentNode);
-      edge(parentNode, g.dn, 1, d.et || 'v');
+      edge(parentNode, g.dn, 1, d.et || 'v', by(d.pk));
     }
     
     hud();
@@ -648,7 +651,7 @@ function openGroup(gi) {
   if (d.pk) {
     const parentNode = by(d.pk).dn;
     from(g.dn, parentNode);
-    edge(parentNode, g.dn, 1, d.et || 'h');
+    edge(parentNode, g.dn, 1, d.et || 'h', by(d.pk));
   } else {
     g.dn.el.style.left = PX + 'px';
     g.dn.el.style.top = PY + 'px';
