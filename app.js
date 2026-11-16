@@ -1157,21 +1157,134 @@ function showPlannerMessage(title, message) {
   toast(title + (message ? ': ' + message : ''));
 }
 
-function setAuthMsg(text, kind) {
-  const el = $('#authMsg');
-  el.textContent = text || '';
-  el.className = 'auth-msg' + (kind ? ' ' + kind : '');
+/* ---------------------------------------------------------------------------
+ * Sign-in terminal: type the email, press Enter, type the password, press Enter.
+ * ------------------------------------------------------------------------- */
+
+let TERM_MODE = 'email';   // 'email' | 'password' | 'busy'
+let TERM_EMAIL = '';
+let TERM_BUSY_ROW = null;
+
+function termInput() {
+  return $(TERM_MODE === 'password' ? '#authPass' : '#authEmail');
 }
 
-function setAuthBusy(busy, label) {
-  const btn = $('#authSubmit');
-  btn.disabled = !!busy;
-  if (busy) {
-    btn.dataset.label = btn.textContent;
-    btn.textContent = label || 'Please wait…';
-  } else if (btn.dataset.label) {
-    btn.textContent = btn.dataset.label;
-    delete btn.dataset.label;
+function termPrint(text, kind) {
+  const log = $('#termLog');
+  const row = document.createElement('div');
+  row.className = 'term-row' + (kind ? ' ' + kind : '');
+  row.textContent = text;
+  log.appendChild(row);
+  while (log.children.length > 14) log.removeChild(log.firstChild);
+  return row;
+}
+
+/** Mirrors the hidden input on screen (passwords show as *), caret included. */
+function termRender() {
+  const input = termInput();
+  const value = input.value;
+  const shown = TERM_MODE === 'password' ? '*'.repeat(value.length) : value;
+  let pos = input.selectionStart;
+  if (pos == null || pos > value.length) pos = value.length;
+  $('#termBefore').textContent = shown.slice(0, pos);
+  $('#termAfter').textContent = shown.slice(pos);
+}
+
+function termPrompt(mode) {
+  TERM_MODE = mode;
+  $('#authForm').hidden = false;
+  $('#termLine').hidden = false;
+  $('#termPrompt').textContent = mode === 'password' ? 'password:' : 'email:';
+  const input = termInput();
+  input.value = '';
+  termRender();
+  try { input.focus({ preventScroll: true }); } catch (e) { /* not focusable yet */ }
+}
+
+function termBusy(on) {
+  if (on) {
+    TERM_MODE = 'busy';
+    $('#termLine').hidden = true;
+    TERM_BUSY_ROW = termPrint('...', 'dim');
+  } else if (TERM_BUSY_ROW) {
+    TERM_BUSY_ROW.remove();
+    TERM_BUSY_ROW = null;
+  }
+}
+
+function termReset() {
+  $('#termLog').textContent = '';
+  TERM_EMAIL = '';
+  $('#authEmail').value = '';
+  $('#authPass').value = '';
+  termPrint('Identify', 'head');
+  termPrompt('email');
+}
+
+function termClearFields() {
+  $('#authEmail').value = '';
+  $('#authPass').value = '';
+}
+
+function termFail(message) {
+  const msg = String(message || '').toLowerCase();
+  if (/email not recogni[sz]ed/.test(msg)) {
+    termPrint('email not recognised', 'err');
+    termPrompt('email');
+  } else if (/password not recogni[sz]ed/.test(msg)) {
+    termPrint('password not recognised', 'err');
+    termPrompt('password');
+  } else if (/too many/.test(msg)) {
+    termPrint(String(message).replace(/\.$/, '').toLowerCase(), 'err');
+    termPrompt('email');
+  } else {
+    termPrint(String(message || 'sign-in failed').replace(/\.$/, '').toLowerCase(), 'err');
+    termPrompt('password');
+  }
+}
+
+function termSignIn(email, password) {
+  const url = PlannerAPI.apiUrl();
+  if (!url || /\/macros\/library\//.test(url)) {
+    termPrint('the backend url in config.js must be the web app url ending in /exec', 'err');
+    termPrompt('email');
+    return;
+  }
+
+  termBusy(true);
+  PlannerAPI.call('login', { email: email, password: password }, { timeout: 30000 })
+    .then(result => {
+      termBusy(false);
+      PlannerAPI.saveSession(result.token, result.user, true);
+      enterApp(result.user);
+    })
+    .catch(err => {
+      termBusy(false);
+      termFail(err && err.message);
+    });
+}
+
+function termEnter() {
+  if (TERM_MODE === 'email') {
+    const v = $('#authEmail').value.trim();
+    if (!v) return;
+    termPrint('email: ' + v);
+
+    // Typing "demo" opens the offline preview (sample data, no account).
+    if (v.toLowerCase() === 'demo') { enterDemo(); return; }
+
+    if (!v.includes('@')) {
+      termPrint('email not recognised', 'err');
+      termPrompt('email');
+      return;
+    }
+    TERM_EMAIL = v;
+    termPrompt('password');
+  } else if (TERM_MODE === 'password') {
+    const pw = $('#authPass').value;
+    if (!pw) return;
+    termPrint('password: ' + '*'.repeat(pw.length));
+    termSignIn(TERM_EMAIL, pw);
   }
 }
 
@@ -1183,15 +1296,14 @@ function showAuth() {
 function showApp() {
   $('#auth').hidden = true;
   $('#app').hidden = false;
+  termClearFields();
 }
 
 function enterApp(user) {
   CURRENT_USER = user || {};
   DEMO = false;
   $('#umInstall').hidden = false;
-  $('#authInstall').hidden = false;
   $('#demoBanner').hidden = true;
-  $('#authMode').textContent = 'Connected';
   showApp();
   init();
 }
@@ -1200,8 +1312,6 @@ function enterDemo() {
   DEMO = true;
   CURRENT_USER = { name: 'Preview mode', email: 'sample data', role: 'teacher' };
   $('#umInstall').hidden = false;
-  $('#authInstall').hidden = false;
-  $('#authMode').textContent = 'Demo mode';
   $('#demoBanner').hidden = false;
   showApp();
   init();
@@ -1220,72 +1330,47 @@ function signOut() {
 
 function pingBackend() {
   const url = PlannerAPI.apiUrl();
-  $('#authMode').textContent = url ? 'Connecting…' : 'Not connected';
 
   if (!url) {
-    setAuthMsg('No backend URL is set in config.js.', 'err');
+    termPrint('no backend url is set in config.js', 'err');
     return Promise.resolve(false);
   }
 
   if (/\/macros\/library\//.test(url)) {
-    $('#authMode').textContent = 'Connection failed';
-    setAuthMsg('The URL in config.js is an Apps Script library link, not a Web App. In Apps Script choose Deploy → Manage deployments → Web app and use the URL that ends in /exec.', 'err');
+    termPrint('config.js holds an apps script library link; use the web app url ending in /exec', 'err');
     return Promise.resolve(false);
   }
 
   return PlannerAPI.call('authStatus', {}, { timeout: 20000 })
     .then(status => {
-      $('#authMode').textContent = 'Connected';
       if (status && status.accounts === 0) {
-        setAuthMsg('Connected, but there are no accounts yet. Add a row to the Database_Logins tab in the database spreadsheet.', 'err');
-      } else {
-        setAuthMsg('');
+        termPrint('no accounts yet: add a row to the Database_Logins tab', 'err');
       }
       return true;
     })
     .catch(err => {
-      $('#authMode').textContent = 'Connection failed';
-      setAuthMsg('Could not reach the backend. ' + err.message, 'err');
+      termPrint('could not reach the backend: ' + err.message, 'err');
       return false;
     });
 }
 
-function submitAuth(e) {
-  e.preventDefault();
-  if (DEMO) { enterDemo(); return; }
-
-  const url = PlannerAPI.apiUrl();
-  if (!url || /\/macros\/library\//.test(url)) {
-    setAuthMsg('The backend URL in config.js must be the Web App URL that ends in /exec.', 'err');
-    return;
-  }
-
-  const email = $('#authEmail').value.trim();
-  const password = $('#authPass').value;
-  const remember = $('#authRemember').checked;
-
-  if (!email || !email.includes('@')) { setAuthMsg('Enter a valid email address.', 'err'); return; }
-  if (!password) { setAuthMsg('Enter your password.', 'err'); return; }
-
-  setAuthMsg('');
-  setAuthBusy(true, 'Signing in…');
-
-  PlannerAPI.call('login', { email: email, password: password }, { timeout: 30000 })
-    .then(result => {
-      PlannerAPI.saveSession(result.token, result.user, remember);
-      setAuthBusy(false);
-      enterApp(result.user);
-    })
-    .catch(err => {
-      setAuthBusy(false);
-      setAuthMsg(err.message, 'err');
-    });
-}
-
 function wireAuth() {
-  $('#authForm').addEventListener('submit', submitAuth);
-  $('#authDemo').addEventListener('click', enterDemo);
-  $('#authInstall').addEventListener('click', installApp);
+  ['#authEmail', '#authPass'].forEach(sel => {
+    const input = $(sel);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); termEnter(); }
+      else if (e.key === 'Escape') { input.value = ''; termRender(); }
+    });
+    ['input', 'keyup', 'click', 'select', 'focus'].forEach(ev => input.addEventListener(ev, termRender));
+  });
+
+  // Tapping anywhere on the screen puts the cursor back on the prompt.
+  $('#auth').addEventListener('click', () => {
+    if (TERM_MODE === 'busy') return;
+    try { termInput().focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+  });
+
+  $('#authForm').addEventListener('submit', e => e.preventDefault());
 }
 
 function wireUserMenu() {
@@ -1344,7 +1429,6 @@ function installApp() {
     installPrompt.prompt();
     installPrompt.userChoice.then(() => {
       installPrompt = null;
-      $('#authInstall').hidden = true;
       $('#umInstall').hidden = true;
     });
     return;
@@ -1356,12 +1440,10 @@ function wireInstall() {
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     installPrompt = e;
-    $('#authInstall').hidden = false;
     if (CURRENT_USER) $('#umInstall').hidden = false;
   });
   window.addEventListener('appinstalled', () => {
     installPrompt = null;
-    $('#authInstall').hidden = true;
     $('#umInstall').hidden = true;
     toast('✓ Lesson Tree Planner installed.');
   });
@@ -1388,13 +1470,13 @@ function boot() {
   const url = PlannerAPI.apiUrl();
 
   if (!url) {
+    termReset();
     pingBackend();
     return;
   }
 
   // Validate any remembered session before showing the planner.
   if (session && session.token) {
-    $('#authMode').textContent = 'Restoring session…';
     PlannerAPI.call('whoami', {}, { timeout: 20000 })
       .then(r => {
         const user = (r && r.user) || session.user;
@@ -1402,16 +1484,17 @@ function boot() {
         enterApp(user);
       })
       .catch(err => {
+        termReset();
         if (err && err.api) {
           PlannerAPI.clearSession();
-          pingBackend().then(() => setAuthMsg('Your session expired. Please sign in again.'));
-        } else {
-          pingBackend();
+          termPrint('session expired', 'dim');
         }
+        pingBackend();
       });
     return;
   }
 
+  termReset();
   pingBackend();
 }
 

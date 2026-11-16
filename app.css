@@ -62,15 +62,13 @@
 #panel .row button.danger:hover { background: rgba(255, 122, 144, 0.12); border-color: var(--bad); }
 
 /* ============================================================
-   SIGN IN SCREEN
+   SIGN IN — terminal on the planner's own canvas (grid + soft glows)
    ============================================================ */
 .auth-screen {
   position: fixed;
   inset: 0;
   z-index: 50;
-  display: grid;
-  place-items: center;
-  padding: 24px 16px;
+  padding: 30px 36px;
   overflow: auto;
   background:
     radial-gradient(circle at 18% 12%, rgba(139, 123, 255, 0.16), transparent 46%),
@@ -82,152 +80,55 @@
 }
 .auth-glow {
   position: absolute;
+  left: 50%;
+  top: 50%;
   width: 520px;
   height: 520px;
+  margin: -260px 0 0 -260px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(94, 242, 255, 0.13), transparent 65%);
   filter: blur(20px);
   pointer-events: none;
 }
-.auth-card {
-  position: relative;
-  width: min(400px, 100%);
-  padding: 26px 26px 22px;
-  border-radius: 22px;
-  background: linear-gradient(160deg, rgba(20, 30, 50, 0.96), rgba(8, 13, 24, 0.97));
-  border: 1px solid rgba(94, 242, 255, 0.32);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65), 0 0 40px rgba(94, 242, 255, 0.08);
-  backdrop-filter: blur(18px);
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 22px;
-}
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  flex: 0 0 46px;
-  border-radius: 14px;
-  color: var(--cy);
-  background: rgba(94, 242, 255, 0.1);
-  border: 1px solid rgba(94, 242, 255, 0.3);
-  box-shadow: 0 0 22px rgba(94, 242, 255, 0.15);
-}
-.brand h1 {
-  margin: 0;
+.term { position: relative; max-width: 640px; }
+.term-row,
+.term-line {
   font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: #fff;
-}
-.brand p {
-  margin: 2px 0 0;
-  font-size: 11.5px;
-  color: var(--mut);
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-bottom: 12px;
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: var(--mut);
-}
-.field input, .field select {
-  width: 100%;
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 400;
-  letter-spacing: 0;
+  line-height: 1.75;
   color: var(--fg);
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(140, 170, 210, 0.28);
-  background: rgba(0, 0, 0, 0.3);
-  outline: 0;
-  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.field input:focus, .field select:focus {
-  border-color: var(--cy);
-  box-shadow: 0 0 0 3px rgba(94, 242, 255, 0.12);
+.term-row { white-space: pre-wrap; word-break: break-word; color: var(--mut); }
+.term-row.head { color: var(--cy); font-weight: 600; }
+.term-row.dim { opacity: 0.6; }
+.term-row.err { color: var(--bad); }
+.term-line { position: relative; display: flex; gap: 0.28em; cursor: text; }
+.term-prompt { color: var(--mut); }
+.term-text { min-width: 1ch; white-space: pre-wrap; word-break: break-all; }
+.term-cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.1em;
+  margin-left: 1px;
+  vertical-align: -0.18em;
+  background: var(--cy);
+  box-shadow: 0 0 10px var(--cy-glow);
+  animation: term-blink 1.05s steps(1) infinite;
 }
-.field select option { background: #0d1525; color: #fff; }
-
-.auth-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 2px 0 16px;
-  font-size: 11.5px;
-  color: var(--mut);
-}
-.chk { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.chk input { accent-color: var(--cy); }
-
-.btn-primary {
-  width: 100%;
-  padding: 11px 14px;
+@keyframes term-blink { 50% { opacity: 0; } }
+.term-in {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
   border: 0;
-  border-radius: 10px;
-  background: linear-gradient(90deg, var(--cy), var(--vi));
-  color: #04121a;
-  font: 600 13.5px 'Sora', system-ui, sans-serif;
-  cursor: pointer;
-  box-shadow: 0 0 20px rgba(94, 242, 255, 0.25);
-  transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+  opacity: 0;
+  pointer-events: none;
 }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 28px rgba(94, 242, 255, 0.42); }
-.btn-primary:disabled { opacity: 0.55; cursor: wait; transform: none; }
-.btn-ghost {
-  padding: 9px 12px;
-  border-radius: 9px;
-  border: 1px solid rgba(140, 170, 210, 0.28);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--fg);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+@media (prefers-reduced-motion: reduce) {
+  .term-cursor { animation: none; }
 }
-.btn-ghost:hover { border-color: var(--cy); background: rgba(94, 242, 255, 0.1); }
-.auth-msg {
-  min-height: 16px;
-  margin: 10px 0 0;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--mut);
-}
-.auth-msg.err { color: var(--bad); }
-.auth-msg.ok { color: var(--green); }
-
-.auth-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-}
-.auth-actions button { flex: 1; }
-.auth-foot {
-  margin: 16px 0 0;
-  text-align: center;
-  font-size: 10.5px;
-  line-height: 1.5;
-  color: var(--mut);
-}
-.fineprint {
-  margin: 8px 0 0;
-  font-size: 10.5px;
-  line-height: 1.5;
-  color: var(--mut);
-}
-.fineprint b { color: var(--fg); font-weight: 500; }
 
 /* ---- Small screens ---- */
 @media (max-width: 720px) {
@@ -243,7 +144,8 @@
   #gear { right: 12px; top: 12px; width: 38px; height: 38px; }
   #panel { right: 12px; top: 58px; width: min(300px, calc(100vw - 24px)); }
   #demoBanner { left: 12px; right: 12px; bottom: 12px; max-width: none; }
-  .auth-card { padding: 22px 20px 18px; }
+  .term-row, .term-line { font-size: 15px; }
+  .auth-screen { padding: 20px 18px; }
   .dn, .dn.wide { width: min(320px, calc(100vw - 32px)); }
   .card { width: min(280px, calc(100vw - 60px)); }
   .final { width: min(290px, calc(100vw - 32px)); }

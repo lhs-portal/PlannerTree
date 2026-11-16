@@ -21,41 +21,15 @@
 <!-- ============ SIGN IN ============ -->
 <div id="auth" class="auth-screen">
   <div class="auth-glow" aria-hidden="true"></div>
-  <div class="auth-card">
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true">
-        <svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <path d="M16 28V6"/><path d="M16 12l7-5"/><path d="M16 18l-7-5"/><path d="M16 24l7-5"/>
-          <circle cx="16" cy="4" r="2.4"/><circle cx="24" cy="6" r="2.2"/><circle cx="8" cy="12" r="2.2"/><circle cx="24" cy="18" r="2.2"/>
-        </svg>
-      </span>
-      <div>
-        <h1>Lesson Tree Planner</h1>
-        <p>Hithadhoo School · weekly lesson design</p>
-      </div>
+  <form id="authForm" class="term" autocomplete="on" novalidate hidden>
+    <div id="termLog" class="term-log" role="log" aria-live="polite"></div>
+    <div id="termLine" class="term-line">
+      <span id="termPrompt" class="term-prompt">email:</span>
+      <span class="term-text"><span id="termBefore"></span><span id="termCursor" class="term-cursor"></span><span id="termAfter"></span></span>
+      <input id="authEmail" class="term-in" type="text" name="email" autocomplete="username" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="email">
+      <input id="authPass" class="term-in" type="password" name="password" autocomplete="current-password" aria-label="password" tabindex="-1">
     </div>
-
-    <form id="authForm" novalidate>
-      <label class="field">Email
-        <input id="authEmail" type="email" autocomplete="username" inputmode="email" placeholder="you@school.edu.mv" required>
-      </label>
-      <label class="field">Password
-        <input id="authPass" type="password" autocomplete="current-password" placeholder="••••••••" required>
-      </label>
-      <div class="auth-meta">
-        <label class="chk"><input id="authRemember" type="checkbox" checked> Keep me signed in</label>
-      </div>
-
-      <button id="authSubmit" type="submit" class="btn-primary">Sign in</button>
-      <p id="authMsg" class="auth-msg" role="status" aria-live="polite"></p>
-    </form>
-
-    <div class="auth-actions">
-      <button type="button" id="authDemo" class="btn-ghost">Preview offline demo</button>
-      <button type="button" id="authInstall" class="btn-ghost" hidden>Install app</button>
-    </div>
-    <p class="auth-foot"><span id="authMode">Connecting…</span> · accounts live in your Google Sheet</p>
-  </div>
+  </form>
 </div>
 
 <!-- ============ APP ============ -->
