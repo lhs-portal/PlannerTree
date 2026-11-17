@@ -13,8 +13,6 @@ const GY = 12;       // Gap between stacked cards
 const PX = 60, PY = 90; // Canvas padding
 
 // Default IDs connecting directly to Google Drive files (from config.js)
-const DEFAULT_TEMPLATE_ID = (window.PLANNER_CONFIG && window.PLANNER_CONFIG.defaultTemplateId) || '';
-const DEFAULT_FOLDER_ID   = (window.PLANNER_CONFIG && window.PLANNER_CONFIG.defaultFolderId) || '';
 
 const MAT = [
   'Whiteboard & markers', 'Slides / projector', 'Printed handouts',
@@ -86,7 +84,6 @@ let times = { starter: 5, main: 25, closure: 5 };
 // Session / mode state
 let DEMO = false;          // offline sample data
 let CURRENT_USER = null;   // { email, name, role }
-let installPrompt = null;  // PWA install event
 let STACKED = false;       // single-column layout on narrow screens
 let ZOOM = 1;              // tree zoom (1 = normal)
 try {
@@ -96,15 +93,12 @@ try {
 
 // Load settings from localStorage or defaults
 try {
-  ['tpl', 'folder', 'week', 'grade', 'lessons'].forEach(k => {
+  ['week', 'grade', 'lessons'].forEach(k => {
     const v = localStorage.getItem('lt_' + k);
     if (v) $('#' + k).value = v;
     $('#' + k).addEventListener('change', e => localStorage.setItem('lt_' + k, e.target.value));
   });
 } catch (e) {}
-
-if (!$('#tpl').value && DEFAULT_TEMPLATE_ID) $('#tpl').value = DEFAULT_TEMPLATE_ID;
-if (!$('#folder').value && DEFAULT_FOLDER_ID) $('#folder').value = DEFAULT_FOLDER_ID;
 
 function toast(t) {
   const b = $('#toast');
@@ -885,17 +879,8 @@ function openFinal() {
 }
 
 function generate() {
-  const tpl = $('#tpl').value.trim();
-  const folder = $('#folder').value.trim();
   const msg = $('#msg');
   const btn = $('#gen');
-
-  if (!tpl) {
-    $('#panel').classList.add('open');
-    $('#tpl').focus();
-    toast('Please configure the Master Template File ID in settings first.');
-    return;
-  }
 
   if (DEMO) {
     toast('Preview mode cannot create Google Sheets files. Connect your Apps Script URL to enable export.');
@@ -910,8 +895,6 @@ function generate() {
 
   PlannerAPI.call('generateWeeklyPlanFile', {
     plan: {
-      templateId: tpl,
-      folderId: folder,
       scheme: $('#scheme').value,
       week: $('#week').value.trim(),
       grade: $('#grade').value.trim(),
@@ -1112,30 +1095,6 @@ function applyDatabase(data, missing) {
 
 $('#reload').onclick = init;
 $('#reset').onclick = start;
-$('#redesign-tpl-btn').onclick = () => {
-  const tpl = $('#tpl').value.trim() || DEFAULT_TEMPLATE_ID;
-  const btn = $('#redesign-tpl-btn');
-  btn.disabled = true;
-  btn.textContent = 'Applying Executive Design to Template…';
-  if (DEMO) {
-    toast('Preview mode cannot edit Drive files. Connect your Apps Script URL to enable this.');
-    btn.disabled = false;
-    btn.textContent = '🎨 Redesign Master Template in Drive';
-    return;
-  }
-  PlannerAPI.call('redesignMasterTemplate', { templateId: tpl }, { timeout: 180000 })
-    .then(() => {
-      toast('✓ Master template successfully redesigned with executive layout!');
-      btn.disabled = false;
-      btn.textContent = '✓ Master Template Redesigned';
-      setTimeout(() => { btn.textContent = '🎨 Redesign Master Template in Drive'; }, 3500);
-    })
-    .catch(e => {
-      toast('Could not redesign template: ' + e.message);
-      btn.disabled = false;
-      btn.textContent = '🎨 Redesign Master Template in Drive';
-    });
-};
 $('#scheme').onchange = () => {
   if (G.length <= 1 && (!G[0] || !G[0].done)) start();
 };
@@ -1302,7 +1261,6 @@ function showApp() {
 function enterApp(user) {
   CURRENT_USER = user || {};
   DEMO = false;
-  $('#umInstall').hidden = false;
   $('#demoBanner').hidden = true;
   showApp();
   init();
@@ -1311,7 +1269,6 @@ function enterApp(user) {
 function enterDemo() {
   DEMO = true;
   CURRENT_USER = { name: 'Preview mode', email: 'sample data', role: 'teacher' };
-  $('#umInstall').hidden = false;
   $('#demoBanner').hidden = false;
   showApp();
   init();
@@ -1389,7 +1346,6 @@ function wireUserMenu() {
   });
 
   $('#umSignout').addEventListener('click', signOut);
-  $('#umInstall').addEventListener('click', installApp);
 }
 
 function wireScrolling() {
@@ -1424,31 +1380,6 @@ function wireScrolling() {
   wrap.addEventListener('pointercancel', end);
 }
 
-function installApp() {
-  if (installPrompt) {
-    installPrompt.prompt();
-    installPrompt.userChoice.then(() => {
-      installPrompt = null;
-      $('#umInstall').hidden = true;
-    });
-    return;
-  }
-  toast('To install: open your browser menu and choose “Install app” or “Add to Home screen”.');
-}
-
-function wireInstall() {
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    installPrompt = e;
-    if (CURRENT_USER) $('#umInstall').hidden = false;
-  });
-  window.addEventListener('appinstalled', () => {
-    installPrompt = null;
-    $('#umInstall').hidden = true;
-    toast('✓ Lesson Tree Planner installed.');
-  });
-}
-
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
@@ -1463,7 +1394,6 @@ function boot() {
   wireUserMenu();
   wireScrolling();
   wireZoom();
-  wireInstall();
   registerServiceWorker();
 
   const session = PlannerAPI.readSession();
