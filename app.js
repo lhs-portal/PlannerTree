@@ -26,7 +26,7 @@ const MAT = [
  *   Step 1: Strand, Sub-strand, Outcome
  *   Step 2: Intention, Indicator, Success Criteria
  *   Step 3: Key Competencies, Shared Values, Prior Learning
- *   Step 4: Materials
+ *   Step 4: Materials, Differentiation
  *   Step 5: Pedagogy Approach
  *   Step 6: Starter, Main, Closure, Assessment
  *   Step 7: Time Allocation
@@ -56,11 +56,12 @@ const FLOW = [
   { st: 3, key: 'VALUES', title: 'Shared Values', src: 'values', multi: 1, group: 2, slot: 1, pk: 'SUCCESS_CRITERIA', et: 'wrap' },
   { st: 3, key: 'PRIOR_LEARNING', title: 'Prior Learning', text: 'What foundational knowledge do students already bring?', group: 2, slot: 2, pk: 'SUCCESS_CRITERIA', et: 'wrap' },
 
-  // --- Step 4: Materials ---
+  // --- Step 4: Materials, and who is in this class (Differentiation) ---
   { st: 4, key: 'MATERIALS', title: 'Materials Needed', opts: MAT, multi: 1, group: 3, slot: 0, pk: 'PRIOR_LEARNING', et: 'wrap' },
+  { st: 4, key: 'DIFFERENTIATION', title: 'Differentiation', group: 3, slot: 1, pk: 'PRIOR_LEARNING', et: 'wrap', isDiff: true },
 
   // --- Step 5: Pedagogy ---
-  { st: 5, key: 'PEDAGOGY', title: 'Pedagogy Approach', opts: ['Teacher-centred', 'Student-centred', 'Blended (Teacher & Student)'], multi: 1, group: 4, slot: 0, pk: 'MATERIALS', et: 'wrap' },
+  { st: 5, key: 'PEDAGOGY', title: 'Pedagogy Approach', opts: ['Teacher-centred', 'Student-centred', 'Blended (Teacher & Student)'], multi: 1, group: 4, slot: 0, pk: 'DIFFERENTIATION', et: 'wrap' },
 
   // --- Step 6: Teaching Strategies and Assessment (all branch from Pedagogy) ---
   { st: 6, key: 'STARTER', title: 'Starter Strategy', src: 'strategies_starter', multi: 1, group: 5, slot: 0, pk: 'PEDAGOGY', et: 'wrap' },
@@ -651,11 +652,205 @@ function itemsFor(src) {
 }
 
 /** Opens a decision node group */
+/* ---------------------------------------------------------------------------
+ * Differentiation node: who is in this class, and how much support they need.
+ * The choices are remembered per teacher and per class, and the node shows
+ * them pre-filled every time so they can be changed for this plan.
+ * ------------------------------------------------------------------------- */
+
+const DIFF_TIERS_UI = [
+  { k: 'support', name: 'Needs support' },
+  { k: 'core', name: 'On level' },
+  { k: 'extension', name: 'Extension' }
+];
+const DIFF_NEEDS_DEFAULT = ['EAL learners', 'Reading & writing', 'Attention & focus', 'Number & calculation',
+  'Hearing', 'Vision', 'Physical & motor', 'Autism & sensory', 'Speech & language'];
+const DIFF_LEVELS = ['Light', 'Medium', 'High'];
+
+function diffSlug(name) {
+  return String(name == null ? '' : name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+}
+
+/** The learning needs offered: from the database tab, or the built-in list. */
+function diffNeeds() {
+  const fromDb = db.differentiation && db.differentiation.needs;
+  return fromDb && fromDb.length ? fromDb : DIFF_NEEDS_DEFAULT.map(n => ({ id: diffSlug(n), name: n }));
+}
+
+function diffClassLabel() {
+  return ($('#grade').value || '').trim();
+}
+
+function diffLocalKey() {
+  const email = ((typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.email) || '').toLowerCase();
+  return 'lt_diff:' + email + ':' + (diffClassLabel().toLowerCase().replace(/\s+/g, ' ') || '(no class)');
+}
+
+/** A safe profile: whole numbers in range, known needs only, levels 1 to 3. */
+function diffClean(raw) {
+  const a = (raw && raw.abilities) || {};
+  const n = v => Math.min(300, Math.max(0, parseInt(v, 10) || 0));
+  const known = {};
+  diffNeeds().forEach(x => { known[x.id] = x; });
+  const needs = [];
+  ((raw && raw.needs) || []).forEach(x => {
+    const id = diffSlug(x && x.id);
+    if (known[id] && !needs.some(y => y.id === id)) {
+      needs.push({ id: id, name: known[id].name, level: Math.min(3, Math.max(1, parseInt(x.level, 10) || 2)) });
+    }
+  });
+  return { abilities: { support: n(a.support), core: n(a.core), extension: n(a.extension) }, needs: needs };
+}
+
+function diffIsEmpty(p) {
+  return !p.abilities.support && !p.abilities.core && !p.abilities.extension && !p.needs.length;
+}
+
+function diffLoadLocal() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(diffLocalKey()) || 'null');
+    return raw ? diffClean(raw) : null;
+  } catch (e) { return null; }
+}
+
+function diffSaveLocal(p) {
+  try {
+    if (diffIsEmpty(p)) localStorage.removeItem(diffLocalKey());
+    else localStorage.setItem(diffLocalKey(), JSON.stringify(p));
+  } catch (e) { /* storage can be unavailable */ }
+}
+
+function diffCanUseServer() {
+  return !DEMO && typeof PlannerAPI !== 'undefined' && PlannerAPI.hasBackend();
+}
+
+function diffSetNeed(row, on, level) {
+  row.querySelector('.df-tog').setAttribute('aria-pressed', String(on));
+  const lv = row.querySelector('.df-lv');
+  lv.hidden = !on;
+  lv.querySelectorAll('button').forEach(b => b.classList.toggle('on', parseInt(b.dataset.l, 10) === level));
+}
+
+function diffTotal(g) {
+  let sum = 0;
+  g.dn.el.querySelectorAll('.df-count input').forEach(i => { sum += parseInt(i.value, 10) || 0; });
+  g.dn.el.querySelector('.df-total').textContent = sum ? 'Total ' + sum : '';
+}
+
+function diffRead(g) {
+  const abilities = {};
+  g.dn.el.querySelectorAll('.df-count input').forEach(i => { abilities[i.dataset.k] = i.value; });
+  const needs = [];
+  g.dn.el.querySelectorAll('.df-need').forEach(row => {
+    if (row.querySelector('.df-tog').getAttribute('aria-pressed') === 'true') {
+      const on = row.querySelector('.df-lv button.on');
+      needs.push({ id: row.dataset.id, level: on ? parseInt(on.dataset.l, 10) : 2 });
+    }
+  });
+  return diffClean({ abilities: abilities, needs: needs });
+}
+
+function diffApply(g, profile) {
+  const p = diffClean(profile);
+  g.dn.el.querySelectorAll('.df-count input').forEach(i => { i.value = p.abilities[i.dataset.k] || 0; });
+  g.dn.el.querySelectorAll('.df-need').forEach(row => {
+    const hit = p.needs.find(n => n.id === row.dataset.id);
+    diffSetNeed(row, !!hit, hit ? hit.level : 2);
+  });
+  diffTotal(g);
+}
+
+function openDifferentiation(g) {
+  const d = g.d;
+  g.touched = false;
+
+  g.dn = mk('dn wide', `
+    <b>${esc(d.title)}</b>
+    <fieldset class="df">
+      <div class="df-sec"><span>Students</span><span class="df-total"></span></div>
+      ${DIFF_TIERS_UI.map(t => `
+        <label class="df-count"><span>${t.name}</span>
+          <input type="number" min="0" max="300" inputmode="numeric" value="0" data-k="${t.k}" aria-label="${t.name}">
+        </label>`).join('')}
+
+      <div class="df-sec"><span>Learning needs</span></div>
+      ${diffNeeds().map(n => `
+        <div class="df-need" data-id="${esc(n.id)}">
+          <button type="button" class="df-tog" aria-pressed="false">${esc(n.name)}</button>
+          <span class="df-lv" hidden>${DIFF_LEVELS.map((l, i) => `<button type="button" data-l="${i + 1}">${l}</button>`).join('')}</span>
+        </div>`).join('')}
+
+      <label class="df-keep"><input type="checkbox" checked><span>Remember for <b class="df-class"></b></span></label>
+    </fieldset>
+    <button class="go" style="visibility:visible">Confirm Differentiation</button>
+  `);
+
+  const el = g.dn.el;
+  el.querySelector('.df-class').textContent = diffClassLabel() || 'this class';
+
+  el.querySelectorAll('.df-count input').forEach(i => i.addEventListener('input', () => { g.touched = true; diffTotal(g); }));
+  el.querySelectorAll('.df-need').forEach(row => {
+    row.querySelector('.df-tog').onclick = () => {
+      g.touched = true;
+      diffSetNeed(row, row.querySelector('.df-tog').getAttribute('aria-pressed') !== 'true', 2);
+    };
+    row.querySelectorAll('.df-lv button').forEach(b => {
+      b.onclick = () => { g.touched = true; diffSetNeed(row, true, parseInt(b.dataset.l, 10)); };
+    });
+  });
+
+  g.dn.btn = el.querySelector('.go');
+  g.dn.btn.onclick = () => {
+    const profile = diffRead(g);
+    sel.DIFFERENTIATION = [profile];
+
+    if (el.querySelector('.df-keep input').checked) {
+      diffSaveLocal(profile);
+      if (diffCanUseServer()) {
+        PlannerAPI.call('saveClassProfile', { classLabel: diffClassLabel(), profile: profile }, { timeout: 20000 })
+          .catch(() => toast('Could not remember this class on the server. It is saved on this device only.'));
+      }
+    }
+
+    el.querySelector('.df').disabled = true;
+    confirmG(g);
+  };
+
+  if (d.pk) {
+    from(g.dn, by(d.pk).dn);
+    (d.pks || [d.pk]).forEach(k => edge(by(k).dn, g.dn, 1, d.et || 'v', by(k)));
+  }
+
+  // Pre-filled every time: this device's copy at once, then the server's copy.
+  diffApply(g, diffLoadLocal());
+  if (diffCanUseServer()) {
+    PlannerAPI.call('getClassProfile', { classLabel: diffClassLabel() }, { timeout: 20000 })
+      .then(r => {
+        if (r && r.profile && !g.touched && !g.done) {
+          diffApply(g, r.profile);
+          diffSaveLocal(diffClean(r.profile));
+        }
+      })
+      .catch(() => { /* this device's copy, or an empty form, is fine */ });
+  }
+
+  hud();
+  layout();
+  show([g.dn]);
+  setTimeout(() => focusOn(g.dn), 60);
+}
+
 function openGroup(gi) {
   if (gi >= FLOW.length) return openFinal();
   const d = FLOW[gi];
   const g = { d, leaves: [], done: false };
   G[gi] = g;
+
+  // 0. Differentiation Node
+  if (d.isDiff) {
+    openDifferentiation(g);
+    return;
+  }
 
   // 1. Time Balancer Node
   if (d.isTimeBar) {
@@ -814,7 +1009,7 @@ function confirmG(g) {
   const keep = g.leaves.filter(c => c.on);
   const drop = g.leaves.filter(c => !c.on);
 
-  if (!g.d.isTimeBar) {
+  if (!g.d.isTimeBar && !g.d.isDiff) {
     sel[g.d.key] = g.d.text
       ? [g.ta.value.trim()]
       : keep.map(c => c.label);
@@ -856,7 +1051,7 @@ function confirmG(g) {
     g.dn.el.classList.add('done');
 
     openGroup(gi + 1);
-  }, (g.d.text || g.d.isTimeBar) ? 0 : 420);
+  }, (g.d.text || g.d.isTimeBar || g.d.isDiff) ? 0 : 420);
 }
 
 function openFinal() {

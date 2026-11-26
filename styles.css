@@ -565,3 +565,37 @@ button:focus-visible, .card:focus-visible, input:focus-visible, select:focus-vis
 @media (prefers-reduced-motion: reduce) {
   .node, path { transition: none !important; }
 }
+
+/* Differentiation node */
+.df { border: 0; margin: 12px 0 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.df:disabled { opacity: 0.75; }
+.df-sec {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 6px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut);
+}
+.df-total { text-transform: none; letter-spacing: 0; color: var(--fg); }
+.df-count {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 6px 12px; border-radius: 10px; font-size: 13px;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(140, 170, 210, 0.15);
+}
+.df-count input {
+  width: 64px; padding: 4px 8px; text-align: right; font: inherit; color: var(--fg);
+  background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(140, 170, 210, 0.28); border-radius: 8px;
+}
+.df-need { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.df-tog {
+  flex: 1; text-align: left; padding: 7px 12px; border-radius: 10px; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--mut);
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(140, 170, 210, 0.2);
+}
+.df-tog[aria-pressed="true"] { border-color: var(--cy); background: rgba(94, 242, 255, 0.12); color: #fff; }
+.df-lv { display: flex; gap: 3px; }
+.df-lv button {
+  padding: 5px 7px; border-radius: 7px; cursor: pointer; font: inherit; font-size: 10.5px; color: var(--mut);
+  background: transparent; border: 1px solid rgba(140, 170, 210, 0.25);
+}
+.df-lv button.on { border-color: var(--cy); background: rgba(94, 242, 255, 0.18); color: #fff; }
+.df-keep { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--mut); cursor: pointer; }
+.df-keep input { accent-color: var(--cy); }
+.dn .df-keep b { display: inline; font-size: inherit; color: var(--fg); font-weight: 600; }
